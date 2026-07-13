@@ -306,6 +306,17 @@ export const TOOLS: ToolDef[] = [
     scope: "External",
   },
   {
+    slug: "subdomain-finder",
+    name: "Subdomain Finder",
+    description:
+      "Discover subdomains of any domain using an extensive passive reconnaissance database.",
+    category: "domain",
+    type: "external",
+    url: "https://subdomainfinder.c99.nl/",
+    icon: Search,
+    scope: "External",
+  },
+  {
     slug: "securityheaders-com",
     name: "SecurityHeaders.com",
     description:
