@@ -71,3 +71,21 @@ code,
 pre {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
+
+/* ── View Transition: circle reveal from click point ────────────── */
+@keyframes circle-grow {
+  0%   { clip-path: circle(0%    at var(--click-x, 50%) var(--click-y, 50%)); }
+  100% { clip-path: circle(150%  at var(--click-x, 50%) var(--click-y, 50%)); }
+}
+
+/* Keep the old snapshot fully visible; the new snapshot (z-index above)
+   expands from the click point to cover it — this gives a growing
+   circle that replaces the old theme with the new. */
+::view-transition-old(root) {
+  animation: none;
+}
+
+::view-transition-new(root) {
+  z-index: 1;
+  animation: circle-grow 1500ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
