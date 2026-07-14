@@ -339,6 +339,17 @@ export const TOOLS: ToolDef[] = [
     scope: "Built-in",
   },
   {
+    slug: "port-scanner",
+    name: "Port Scanner",
+    description:
+      "Scan common ports on a target host to check which services are exposed and reachable.",
+    category: "domain",
+    type: "builtin",
+    route: builtin("port-scanner"),
+    icon: Network,
+    scope: "Built-in",
+  },
+  {
     slug: "securityheaders-com",
     name: "SecurityHeaders.com",
     description:
