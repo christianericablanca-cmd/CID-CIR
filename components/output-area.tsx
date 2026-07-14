@@ -46,7 +46,7 @@ export function OutputArea({
           <span />
         )}
         <div className="flex items-center gap-2">
-          {value && onDownload !== undefined && (
+          {value && (
             <Button variant="secondary" size="sm" onClick={handleDownload}>
               <Download className="size-4" />
               Download
@@ -55,14 +55,15 @@ export function OutputArea({
           <CopyButton value={value} label="Copy" />
         </div>
       </div>
-      <div
+      <textarea
+        readOnly
+        value={value}
+        placeholder={placeholder}
         className={cn(
-          "min-h-[120px] w-full overflow-auto rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground font-mono",
-          !value && "flex items-center justify-center text-muted/50"
+          "min-h-[120px] w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted/50 font-mono",
+          !value && "text-muted/50"
         )}
-      >
-        {value || <span className="text-center">{placeholder}</span>}
-      </div>
+      />
     </div>
   );
 }
