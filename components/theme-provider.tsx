@@ -30,7 +30,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
       const y = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
 
-      animateThemeTransition(x, y, theme, next, () => setTheme(next));
+      // Update React state immediately so the re-render flushes synchronously
+      // (inside the event handler) while the clone is being created and positioned.
+      // The animation overlay hides any DOM churn from the re-render.
+      setTheme(next);
+      animateThemeTransition(x, y, theme, next);
     },
     [theme]
   );
