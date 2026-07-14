@@ -1,12 +1,13 @@
 "use client";
 
 import * as React from "react";
+import { animateThemeTransition } from "@/lib/theme-transition";
 
 type Theme = "dark" | "light";
 
 interface ThemeContextValue {
   theme: Theme;
-  toggleTheme: () => void;
+  toggleTheme: (e?: React.MouseEvent<HTMLElement>) => void;
 }
 
 const ThemeContext = React.createContext<ThemeContextValue | undefined>(
@@ -22,14 +23,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.toggle("dark", stored === "dark");
   }, []);
 
-  const toggleTheme = React.useCallback(() => {
-    setTheme((prev) => {
-      const next: Theme = prev === "dark" ? "light" : "dark";
-      localStorage.setItem("cid-theme", next);
-      document.documentElement.classList.toggle("dark", next === "dark");
-      return next;
-    });
-  }, []);
+  const toggleTheme = React.useCallback(
+    (e?: React.MouseEvent<HTMLElement>) => {
+      const next: Theme = theme === "dark" ? "light" : "dark";
+      const rect = (e?.currentTarget as HTMLElement)?.getBoundingClientRect();
+      const x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+      const y = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+
+      animateThemeTransition(x, y, theme, next).then(() => {
+        setTheme(next);
+      });
+    },
+    [theme]
+  );
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

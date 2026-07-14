@@ -40,26 +40,34 @@ export function VersePopup() {
           >
             <button
               onClick={() => setShow(false)}
-              className="absolute right-4 top-4 rounded-md p-1 text-muted transition-colors hover:bg-secondary hover:text-foreground"
+              className="absolute right-4 top-4 z-10 rounded-md p-1 text-muted transition-colors hover:bg-secondary hover:text-foreground"
             >
               <X className="size-4" />
             </button>
 
-            <div className="mb-5 flex size-12 items-center justify-center rounded-xl bg-accent/10 text-accent">
-              <BookOpen className="size-6" />
+            <div className="relative mb-6 flex flex-col items-center">
+              <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/20 to-accent/5 text-accent ring-1 ring-accent/20">
+                <BookOpen className="size-7" />
+              </div>
+              <span className="mt-3 text-[11px] uppercase tracking-[0.2em] text-accent">
+                Daily Dose of Scripture
+              </span>
+              <div className="mt-4 h-px w-12 bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
             </div>
 
-            <p className="text-base leading-relaxed text-foreground sm:text-lg">
-              &ldquo;{verse.current.text}&rdquo;
+            <p className="text-center text-base leading-relaxed text-foreground sm:text-lg">
+              <span className="text-accent/60">&ldquo;</span>
+              {verse.current.text}
+              <span className="text-accent/60">&rdquo;</span>
             </p>
 
-            <p className="mt-4 text-sm font-medium text-accent">
+            <p className="mt-5 text-center text-sm font-medium text-accent">
               — {verse.current.ref}
             </p>
 
             <button
               onClick={() => setShow(false)}
-              className="mt-6 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent/90"
+              className="mt-7 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-accent/20 transition-all hover:bg-accent/90 hover:shadow-accent/30 active:scale-[0.98]"
             >
               Continue
             </button>
