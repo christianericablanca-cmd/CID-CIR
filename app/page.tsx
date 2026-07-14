@@ -38,7 +38,7 @@ function SidebarToolItem({
   layoutIdPrefix: string;
   onSelect: (slug: string) => void;
 }) {
-  const status = useReachability(tool.type === "external" ? tool.url : undefined);
+  const { status } = useReachability(tool.type === "external" ? tool.url : undefined);
   return (
     <button
       onClick={() => onSelect(tool.slug)}
@@ -140,7 +140,7 @@ function SidebarNav({
 
 
 function ExternalToolCard({ tool, Icon }: { tool: ToolDef; Icon: React.ComponentType<{ className?: string }> }) {
-  const status = useReachability(tool.url);
+  const { status, refresh, refreshing } = useReachability(tool.url);
   return (
     <div className="flex flex-col items-center justify-center gap-5 rounded-xl border border-border bg-card px-5 py-12 text-center sm:px-6 sm:py-20">
       <div className="flex size-14 items-center justify-center rounded-xl bg-accent/10 text-accent">
@@ -149,11 +149,16 @@ function ExternalToolCard({ tool, Icon }: { tool: ToolDef; Icon: React.Component
       <div className="max-w-sm">
         <p className="text-sm leading-relaxed text-muted">{tool.description}</p>
       </div>
-      <div className="flex items-center gap-3">
-        <span className="flex items-center gap-1.5 text-xs text-muted">
+      <div className="flex items-center gap-2">
+        <span className="flex items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-2.5 py-1.5 text-xs text-muted">
           <LedIndicator status={status} />
-          {status === "online" ? "Online" : status === "offline" ? "Offline" : "Checking..."}
+          {status === "online" ? "Online" : status === "offline" ? "Unreachable" : status === "unknown" ? "Uncertain" : "Checking..."}
         </span>
+        {status === "unknown" && (
+          <Button variant="secondary" size="sm" onClick={refresh} disabled={refreshing}>
+            {refreshing ? "..." : "Check"}
+          </Button>
+        )}
         <Button asChild className="gap-2">
           <a href={tool.url} target="_blank" rel="noopener noreferrer">
             Open {tool.name}
@@ -265,14 +270,29 @@ export default function HomePage() {
             </div>
           </div>
 
-          <SidebarNav
-            groups={allGroups}
-            selected={selected}
-            collapsed={collapsed}
-            onToggleCollapse={toggleCollapse}
-            onSelect={selectTool}
-            layoutIdPrefix="M"
-          />
+          {/* Mobile: all tools */}
+          <div className="flex-1 overflow-hidden lg:hidden">
+            <SidebarNav
+              groups={allGroups}
+              selected={selected}
+              collapsed={collapsed}
+              onToggleCollapse={toggleCollapse}
+              onSelect={selectTool}
+              layoutIdPrefix="M"
+            />
+          </div>
+
+          {/* Desktop: left half of tools */}
+          <div className="hidden flex-1 overflow-hidden lg:block">
+            <SidebarNav
+              groups={leftGroups}
+              selected={selected}
+              collapsed={collapsed}
+              onToggleCollapse={toggleCollapse}
+              onSelect={selectTool}
+              layoutIdPrefix="L"
+            />
+          </div>
 
           <div className="border-t border-border/60 px-3 py-2">
             <button
