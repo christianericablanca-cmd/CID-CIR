@@ -244,8 +244,8 @@ export default function HomePage() {
                 <Shield className="size-4" />
               </div>
               <div>
-                <p className="text-xs font-semibold leading-tight text-foreground">CIR</p>
-                <p className="text-[10px] leading-tight text-muted">CID — OSINT & Security Toolkit</p>
+                <p className="text-xs font-semibold leading-tight text-foreground">Toolkit</p>
+                <p className="text-[10px] leading-tight text-muted">CID — OSINT & Security</p>
               </div>
             </div>
           </div>
