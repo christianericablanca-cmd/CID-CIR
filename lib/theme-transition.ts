@@ -1,4 +1,4 @@
-const DURATION = 1200;
+const DURATION = 1500;
 const FADE_OUT = 200;
 
 const THEME_VARS = [
@@ -25,7 +25,6 @@ export function animateThemeTransition(
     Math.max(x, innerWidth - x),
     Math.max(y, innerHeight - y),
   );
-  // extra 10% for safety
   const fullR = Math.ceil(maxDist * 1.1);
 
   // ── 1. Switch html to the NEW theme ─────────────────────────────
@@ -59,16 +58,18 @@ export function animateThemeTransition(
   document.documentElement.classList.toggle("dark", from === "dark");
 
   // ── 7. Position the clone as a fixed overlay ────────────────────
+  // NOTE: no `overflow: hidden` — that suppresses scrollbars, making the
+  // clone ~15px wider than the real page, which causes a layout shift
+  // (the "pulse") when the clone is removed.
+  // NOTE: no `will-change` — avoids creating a compositor layer that
+  // flashes when torn down.
   Object.assign(clone.style, {
     position: "fixed",
     inset: "0",
-    overflow: "hidden",
     zIndex: "9999",
     clipPath: `circle(0% at ${x}px ${y}px)`,
     transition: `clip-path ${DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
     pointerEvents: "none",
-    willChange: "clip-path",
-    // Match the real page's scroll position so there's no jump
     transform: `translate(-${scrollX}px, -${scrollY}px)`,
   });
 
@@ -78,19 +79,21 @@ export function animateThemeTransition(
   clone.getBoundingClientRect();
   clone.style.clipPath = `circle(${fullR}px at ${x}px ${y}px)`;
 
-  // ── 9. After animation, switch theme and fade out the clone smoothly ──
+  // ── 9. After animation, switch theme and detach the clone ───────
   setTimeout(() => {
     document.documentElement.classList.toggle("dark", to === "dark");
     localStorage.setItem("cid-theme", to);
 
-    // Fade out to avoid a hard compositor-layer tear-down flash
-    clone.style.willChange = "auto";
+    // Fade out to smooth any remaining visual mismatch
     clone.style.transition = `opacity ${FADE_OUT}ms ease`;
     clone.style.opacity = "0";
 
-    // Remove after the fade completes
     setTimeout(() => {
-      clone.remove();
+      // Move the clone into a document fragment instead of calling remove().
+      // appendChild detaches the element without triggering synchronous
+      // compositor-layer teardown – the clone stays alive in the fragment
+      // and is garbage-collected naturally without a visible flash.
+      document.createDocumentFragment().appendChild(clone);
     }, FADE_OUT + 20);
   }, DURATION + 80);
 }
