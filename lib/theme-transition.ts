@@ -11,38 +11,40 @@ export function animateThemeTransition(
   from: string,
   to: string
 ): void {
-  const oldBg = BG[from];
+  const newBg = BG[to];
 
-  // 1. Switch html to the NEW theme — content changes instantly
-  document.documentElement.classList.toggle("dark", to === "dark");
+  // Keep html as the OLD theme — content outside the circle stays as-is
 
-  // 2. Create a simple background overlay (no clone, no content)
+  // Overlay with NEW theme's background, starting as a tiny dot at the button
   const overlay = document.createElement("div");
   Object.assign(overlay.style, {
     position: "fixed",
     inset: "0",
     zIndex: "9999",
-    background: oldBg,
-    // Start at full coverage — hides the instant theme switch
-    clipPath: `circle(150% at ${x}px ${y}px)`,
+    background: newBg,
+    clipPath: `circle(0% at ${x}px ${y}px)`,
     transition: `clip-path ${DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
     pointerEvents: "none",
     willChange: "clip-path",
   });
 
   document.body.appendChild(overlay);
-
-  // 3. Force reflow then shrink the circle to the click point.
-  //    As it shrinks, the new-themed real page is revealed OUTSIDE
-  //    the circle.  From the user's perspective the new theme expands
-  //    from the edges and converges on the button.
   overlay.getBoundingClientRect();
-  overlay.style.clipPath = `circle(0% at ${x}px ${y}px)`;
 
-  // 4. After the transition, just remove the overlay.
-  //    No clone, no fade, no content mismatch → NO PULSE.
+  // Expand the circle — new theme bg scorches OUTWARD from the button.
+  // Outside the circle the old-themed page is still visible;
+  // inside the circle the solid new bg covers the old content.
+  overlay.style.clipPath = `circle(150% at ${x}px ${y}px)`;
+
+  // After the animation: switch the real theme and remove the overlay
   setTimeout(() => {
-    overlay.remove();
+    document.documentElement.classList.toggle("dark", to === "dark");
     localStorage.setItem("cid-theme", to);
+
+    // Brief fade-out to avoid a hard reveal of the new content underneath
+    overlay.style.transition = "opacity 150ms ease";
+    overlay.style.opacity = "0";
+
+    setTimeout(() => overlay.remove(), 170);
   }, DURATION + 80);
 }

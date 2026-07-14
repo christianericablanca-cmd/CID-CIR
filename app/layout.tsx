@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -32,6 +33,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans bg-background text-foreground antialiased`}>
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`try{(function(){var t=localStorage.getItem('cid-theme');document.documentElement.classList.toggle('dark',t!=='light')})()}catch(e){}`}
+        </Script>
         <ThemeProvider>
           <SearchProvider>
             <div className="flex min-h-screen flex-col">
