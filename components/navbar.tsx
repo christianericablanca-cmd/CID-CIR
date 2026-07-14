@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const GITHUB_URL = "https://github.com";
+const GITHUB_URL = "https://github.com/christianericablanca-cmd/CID-CIR";
 
 export function Navbar() {
   const { theme, toggleTheme } = useTheme();
