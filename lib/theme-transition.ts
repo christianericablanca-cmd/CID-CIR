@@ -1,4 +1,5 @@
-const DURATION = 900;
+const DURATION = 1200;
+const FADE_OUT = 200;
 
 const THEME_VARS = [
   "--background",
@@ -77,10 +78,19 @@ export function animateThemeTransition(
   clone.getBoundingClientRect();
   clone.style.clipPath = `circle(${fullR}px at ${x}px ${y}px)`;
 
-  // ── 9. After animation, persist and clean up ────────────────────
+  // ── 9. After animation, switch theme and fade out the clone smoothly ──
   setTimeout(() => {
     document.documentElement.classList.toggle("dark", to === "dark");
     localStorage.setItem("cid-theme", to);
-    clone.remove();
+
+    // Fade out to avoid a hard compositor-layer tear-down flash
+    clone.style.willChange = "auto";
+    clone.style.transition = `opacity ${FADE_OUT}ms ease`;
+    clone.style.opacity = "0";
+
+    // Remove after the fade completes
+    setTimeout(() => {
+      clone.remove();
+    }, FADE_OUT + 20);
   }, DURATION + 80);
 }
