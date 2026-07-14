@@ -30,9 +30,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
       const y = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
 
-      animateThemeTransition(x, y, theme, next).then(() => {
-        setTheme(next);
-      });
+      animateThemeTransition(x, y, theme, next, () => setTheme(next));
     },
     [theme]
   );

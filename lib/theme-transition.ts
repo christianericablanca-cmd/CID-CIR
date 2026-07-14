@@ -17,7 +17,8 @@ export function animateThemeTransition(
   x: number,
   y: number,
   from: string,
-  to: string
+  to: string,
+  onDone?: () => void
 ): Promise<void> {
   return new Promise((resolve) => {
     // 1. Switch to the NEW theme on <html>
@@ -63,12 +64,16 @@ export function animateThemeTransition(
     clone.getBoundingClientRect();
     clone.style.clipPath = `circle(150% at ${x}px ${y}px)`;
 
-    // 8. After animation, persist the theme and remove the clone
+    // 8. After animation, persist the theme, update React state, then remove clone
     setTimeout(() => {
       document.documentElement.classList.toggle("dark", to === "dark");
       localStorage.setItem("cid-theme", to);
-      clone.remove();
-      resolve();
+      // Fire React state update BEFORE removing the clone so the re-render is hidden
+      onDone?.();
+      requestAnimationFrame(() => {
+        clone.remove();
+        resolve();
+      });
     }, DURATION + 80);
   });
 }
