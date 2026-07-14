@@ -271,7 +271,7 @@ export default function HomePage() {
           </div>
 
           {/* Mobile: all tools */}
-          <div className="flex-1 overflow-hidden lg:hidden">
+          <div className="flex-1 overflow-y-auto lg:hidden">
             <SidebarNav
               groups={allGroups}
               selected={selected}
@@ -283,7 +283,7 @@ export default function HomePage() {
           </div>
 
           {/* Desktop: left half of tools */}
-          <div className="hidden flex-1 overflow-hidden lg:block">
+          <div className="hidden flex-1 overflow-y-auto lg:block">
             <SidebarNav
               groups={leftGroups}
               selected={selected}
