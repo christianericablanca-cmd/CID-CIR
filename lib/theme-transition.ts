@@ -48,24 +48,26 @@ export function animateThemeTransition(
   // ── 5. Switch <html> back to OLD theme ────────────────────────
   document.documentElement.classList.toggle("dark", from === "dark");
 
-  // ── 6. Position clone as fixed overlay with scroll offset ─────
-  //     The transform shifts the clone's content to match the real
-  //     page's scroll position so both show identical content at
-  //     the same viewport coordinates.
+  // ── 6. Position clone as a fixed overlay ───────────────────────
+  //     Use `overflow: auto` + `scrollTop` to match the real page's
+  //     scroll position.  Unlike `transform`, this preserves the
+  //     coordinate system so `position: sticky` descendants (like
+  //     the Navbar) behave identically to the real page.
   //     No `will-change` (avoids compositor-layer teardown flash).
-  //     No `overflow` override (preserves scrollbar width so layout
-  //     dimensions match exactly).
   Object.assign(clone.style, {
     position: "fixed",
     inset: "0",
+    overflow: "auto",
     zIndex: "9999",
     clipPath: `circle(0% at ${x}px ${y}px)`,
     transition: `clip-path ${DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
     pointerEvents: "none",
-    transform: `translate(-${scrollX}px, -${scrollY}px)`,
   });
 
   document.body.appendChild(clone);
+  // Scroll the clone so its visible content matches the real viewport
+  clone.scrollTop = scrollY;
+  clone.scrollLeft = scrollX;
 
   // ── 7. Force reflow then expand the circle ────────────────────
   clone.getBoundingClientRect();
