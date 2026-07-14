@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, X } from "lucide-react";
 import { randomVerse } from "@/lib/verses";
 
-const LS_KEY = "cid-cir-verse-shown";
+const LS_KEY = "cid-dds-shown";
 
 export function VersePopup() {
   const [show, setShow] = React.useState(false);
