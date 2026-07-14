@@ -3,8 +3,8 @@
 import * as React from "react";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { CopyButton } from "@/components/copy-button";
-import { cn } from "@/lib/utils";
 
 export function OutputArea({
   label,
@@ -55,15 +55,7 @@ export function OutputArea({
           <CopyButton value={value} label="Copy" />
         </div>
       </div>
-      <textarea
-        readOnly
-        value={value}
-        placeholder={placeholder}
-        className={cn(
-          "min-h-[120px] w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted/50 font-mono",
-          !value && "text-muted/50"
-        )}
-      />
+      <Textarea readOnly value={value} placeholder={placeholder} className="resize-none" />
     </div>
   );
 }
