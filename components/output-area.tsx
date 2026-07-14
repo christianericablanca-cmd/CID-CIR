@@ -45,17 +45,18 @@ export function OutputArea({
         ) : (
           <span />
         )}
-        <div className="flex items-center gap-2">
-          {value && (
-            <Button variant="secondary" size="sm" onClick={handleDownload}>
-              <Download className="size-4" />
-              Download
-            </Button>
-          )}
-          <CopyButton value={value} label="Copy" />
-        </div>
+        <span className="text-xs text-muted/60">{value.length} characters</span>
       </div>
       <Textarea readOnly value={value} placeholder={placeholder} className="resize-none" />
+      {value && (
+        <div className="mt-2 flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={handleDownload}>
+            <Download className="size-4" />
+            Download
+          </Button>
+          <CopyButton value={value} label="Copy" />
+        </div>
+      )}
     </div>
   );
 }
