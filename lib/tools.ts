@@ -317,6 +317,28 @@ export const TOOLS: ToolDef[] = [
     scope: "External",
   },
   {
+    slug: "isitdown",
+    name: "Is It Down Right Now",
+    description:
+      "Check if a website is currently down or accessible worldwide.",
+    category: "domain",
+    type: "external",
+    url: "https://www.isitdownrightnow.com/",
+    icon: Activity,
+    scope: "External",
+  },
+  {
+    slug: "down-checker",
+    name: "Down Checker",
+    description:
+      "Check if a website is reachable from our servers — shows HTTP status and response time.",
+    category: "domain",
+    type: "builtin",
+    route: builtin("down-checker"),
+    icon: Activity,
+    scope: "Built-in",
+  },
+  {
     slug: "securityheaders-com",
     name: "SecurityHeaders.com",
     description:
@@ -500,6 +522,16 @@ export const TOOLS: ToolDef[] = [
     category: "monitoring",
     type: "external",
     url: "https://femboyforum.com/",
+    icon: MessageCircle,
+    scope: "External",
+  },
+  {
+    slug: "vecert-forums",
+    name: "VeCert Forums",
+    description: "Cybersecurity forum community for threat discussions, analysis, and intelligence sharing.",
+    category: "monitoring",
+    type: "external",
+    url: "https://analyzer.vecert.io/forums",
     icon: MessageCircle,
     scope: "External",
   },

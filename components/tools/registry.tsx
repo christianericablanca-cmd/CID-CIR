@@ -18,6 +18,7 @@ import { HttpHeadersTool } from "@/components/tools/http-headers";
 import { GoogleDorkTool } from "@/components/tools/google-dork";
 
 import { RansomwareLiveTool } from "@/components/tools/ransomware-live";
+import { DownCheckerTool } from "@/components/tools/down-checker";
 
 export const TOOL_REGISTRY: Record<string, ComponentType> = {
   "url-defang": UrlDefangTool,
@@ -38,4 +39,5 @@ export const TOOL_REGISTRY: Record<string, ComponentType> = {
   "google-dork": GoogleDorkTool,
 
   "ransomware-live": RansomwareLiveTool,
+  "down-checker": DownCheckerTool,
 };

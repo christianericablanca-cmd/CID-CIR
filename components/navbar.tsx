@@ -32,8 +32,11 @@ export function Navbar() {
             <Shield className="size-5" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-bold tracking-tight leading-tight">
+            <span className="hidden sm:block text-sm font-bold tracking-tight leading-tight">
               CID CENTRALIZED INVESTIGATION REPOSITORY
+            </span>
+            <span className="sm:hidden text-sm font-bold tracking-tight leading-tight">
+              CID-CIR
             </span>
             <span className="text-[10px] font-medium tracking-wider text-muted uppercase">
               CIR

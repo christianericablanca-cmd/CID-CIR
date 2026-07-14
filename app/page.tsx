@@ -24,6 +24,48 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { LedIndicator } from "@/components/led-indicator";
+import { useReachability } from "@/lib/use-reachability";
+
+function SidebarToolItem({
+  tool,
+  isActive,
+  layoutIdPrefix,
+  onSelect,
+}: {
+  tool: ToolDef;
+  isActive: boolean;
+  layoutIdPrefix: string;
+  onSelect: (slug: string) => void;
+}) {
+  const status = useReachability(tool.type === "external" ? tool.url : undefined);
+  return (
+    <button
+      onClick={() => onSelect(tool.slug)}
+      className={cn(
+        "group relative flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-xs transition-all duration-150",
+        isActive
+          ? "bg-accent/10 text-accent font-medium"
+          : "text-foreground/70 hover:bg-secondary/50 hover:text-foreground"
+      )}
+    >
+      {isActive && (
+        <motion.span
+          layoutId={`activeTab${layoutIdPrefix}`}
+          className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r bg-accent"
+        />
+      )}
+      <tool.icon className="size-3.5 shrink-0" />
+      <span className="truncate">{tool.name}</span>
+      {tool.type === "external" && (
+        <span className="ml-auto flex items-center gap-1">
+          <LedIndicator status={status} />
+          <ExternalLink className="size-3 shrink-0 text-muted/40 group-hover:text-muted/70" />
+        </span>
+      )}
+    </button>
+  );
+}
 
 function SidebarNav({
   groups,
@@ -75,33 +117,15 @@ function SidebarNav({
                   className="overflow-hidden"
                 >
                   <div className="ml-1 space-y-[1px] pb-1">
-                    {tools.map((tool) => {
-                      const isActive = selected === tool.slug;
-                      return (
-                        <button
-                          key={tool.slug}
-                          onClick={() => onSelect(tool.slug)}
-                          className={cn(
-                            "group relative flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-xs transition-all duration-150",
-                            isActive
-                              ? "bg-accent/10 text-accent font-medium"
-                              : "text-foreground/70 hover:bg-secondary/50 hover:text-foreground"
-                          )}
-                        >
-                          {isActive && (
-                            <motion.span
-                              layoutId={`activeTab${layoutIdPrefix}`}
-                              className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r bg-accent"
-                            />
-                          )}
-                          <tool.icon className="size-3.5 shrink-0" />
-                          <span className="truncate">{tool.name}</span>
-                          {tool.type === "external" && (
-                            <ExternalLink className="ml-auto size-3 shrink-0 text-muted/40 group-hover:text-muted/70" />
-                          )}
-                        </button>
-                      );
-                    })}
+                    {tools.map((tool) => (
+                      <SidebarToolItem
+                        key={tool.slug}
+                        tool={tool}
+                        isActive={selected === tool.slug}
+                        layoutIdPrefix={layoutIdPrefix}
+                        onSelect={onSelect}
+                      />
+                    ))}
                   </div>
                 </motion.div>
               )}
@@ -114,6 +138,32 @@ function SidebarNav({
 }
 
 
+
+function ExternalToolCard({ tool, Icon }: { tool: ToolDef; Icon: React.ComponentType<{ className?: string }> }) {
+  const status = useReachability(tool.url);
+  return (
+    <div className="flex flex-col items-center justify-center gap-5 rounded-xl border border-border bg-card px-5 py-12 text-center sm:px-6 sm:py-20">
+      <div className="flex size-14 items-center justify-center rounded-xl bg-accent/10 text-accent">
+        <Icon className="size-7" />
+      </div>
+      <div className="max-w-sm">
+        <p className="text-sm leading-relaxed text-muted">{tool.description}</p>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="flex items-center gap-1.5 text-xs text-muted">
+          <LedIndicator status={status} />
+          {status === "online" ? "Online" : status === "offline" ? "Offline" : "Checking..."}
+        </span>
+        <Button asChild className="gap-2">
+          <a href={tool.url} target="_blank" rel="noopener noreferrer">
+            Open {tool.name}
+            <ExternalLink className="size-4" />
+          </a>
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   const { query, setQuery } = useSearch();
@@ -133,6 +183,7 @@ export default function HomePage() {
   const midIdx = Math.ceil(grouped.length / 2);
   const leftGroups = grouped.slice(0, midIdx);
   const rightGroups = grouped.slice(midIdx);
+  const allGroups = grouped; // for mobile drawer
 
   const selectedTool = selected ? getToolBySlug(selected) : null;
 
@@ -154,7 +205,7 @@ export default function HomePage() {
       {/* Hamburger toggle (mobile) */}
       <button
         onClick={() => setShowLeft(true)}
-        className="fixed left-4 top-20 z-30 flex size-9 items-center justify-center rounded-lg border border-border bg-background text-muted shadow-sm lg:hidden"
+        className="fixed left-4 top-[4.5rem] z-30 flex size-9 items-center justify-center rounded-lg border border-border bg-background text-muted shadow-sm lg:hidden"
       >
         <Menu className="size-4" />
       </button>
@@ -215,12 +266,12 @@ export default function HomePage() {
           </div>
 
           <SidebarNav
-            groups={leftGroups}
+            groups={allGroups}
             selected={selected}
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
             onSelect={selectTool}
-            layoutIdPrefix="L"
+            layoutIdPrefix="M"
           />
 
           <div className="border-t border-border/60 px-3 py-2">
@@ -241,7 +292,7 @@ export default function HomePage() {
       </aside>
 
       {/* ── Center Workspace ─────────────────────────────────────── */}
-      <main className="flex min-h-[calc(100vh-4rem)] flex-1 flex-col bg-gradient-to-b from-transparent via-secondary/[0.02] to-transparent">
+      <main className="flex min-h-[calc(100vh-4rem)] flex-1 flex-col bg-gradient-to-b from-transparent via-secondary/[0.02] to-transparent pl-12 lg:pl-0">
         <AnimatePresence mode="wait">
           {!selected || !selectedTool ? (
             <motion.div
@@ -288,9 +339,9 @@ export default function HomePage() {
                 return (
                   <>
                     {/* Workspace */}
-                    <div className="flex-1 p-5 sm:p-8">
+                    <div className="flex-1 p-4 sm:p-8">
                       <div className="mx-auto max-w-5xl">
-                        <div className="mb-8 flex items-start gap-4">
+                        <div className="mb-6 flex items-start gap-3 sm:mb-8 sm:gap-4">
                           <button
                             onClick={deselectTool}
                             className="mt-1 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted transition-colors hover:bg-secondary/60 hover:text-foreground"
@@ -298,35 +349,22 @@ export default function HomePage() {
                             <ArrowRight className="size-3 rotate-180" />
                             Back
                           </button>
-                          <span className="mt-1 text-muted/30">|</span>
-                          <Icon className="mt-1 size-6 text-accent" />
-                          <div>
-                            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                          <span className="mt-1 text-muted/30 hidden sm:inline">|</span>
+                          <Icon className="mt-1 size-5 shrink-0 text-accent sm:size-6" />
+                          <div className="min-w-0">
+                            <h1 className="text-lg font-semibold tracking-tight text-foreground sm:text-2xl">
                               {tool.name}
                             </h1>
-                            <p className="mt-1 text-sm leading-relaxed text-muted">
+                            <p className="mt-0.5 text-xs leading-relaxed text-muted sm:mt-1 sm:text-sm">
                               {tool.description}
                             </p>
                           </div>
                         </div>
 
                         {isExternal ? (
-                          <div className="flex flex-col items-center justify-center gap-5 rounded-xl border border-border bg-card px-6 py-20 text-center">
-                            <div className="flex size-14 items-center justify-center rounded-xl bg-accent/10 text-accent">
-                              <Icon className="size-7" />
-                            </div>
-                            <div className="max-w-sm">
-                              <p className="text-sm leading-relaxed text-muted">{tool.description}</p>
-                            </div>
-                            <Button asChild className="gap-2">
-                              <a href={tool.url} target="_blank" rel="noopener noreferrer">
-                                Open {tool.name}
-                                <ExternalLink className="size-4" />
-                              </a>
-                            </Button>
-                          </div>
+                          <ExternalToolCard tool={tool} Icon={Icon} />
                         ) : (
-                          <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
+                          <div className="rounded-xl border border-border bg-card p-4 sm:p-6">
                             <ToolComponent />
                           </div>
                         )}
@@ -335,7 +373,7 @@ export default function HomePage() {
 
                     {/* ── Tool Info (below workspace) ────────────── */}
                     <div className="border-t border-border/60 bg-secondary/20 px-5 py-4 sm:px-8">
-                      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-8 gap-y-3 text-xs">
+                      <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-3 text-xs">
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-medium uppercase tracking-wider text-muted/50">Type</span>
                           <Badge variant={isExternal ? "secondary" : "default"} className="text-[10px] uppercase tracking-wider">
