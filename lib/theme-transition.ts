@@ -71,13 +71,21 @@ export function animateThemeTransition(
   clone.getBoundingClientRect();
   clone.style.clipPath = `circle(${fullR}px at ${x}px ${y}px)`;
 
-  // ── 8. After animation: switch theme, hide clone instantly ────
+  // ── 8. After animation: switch theme, let recalc settle, then hide ──
   setTimeout(() => {
+    // Frame 1: toggle the class — triggers a full style recalc for all
+    // elements behind the clone.  The clone stays visible so the user
+    // doesn't see the recalc.
     document.documentElement.classList.toggle("dark", to === "dark");
     localStorage.setItem("cid-theme", to);
 
-    // Instantly hide — no opacity transition, no crossfade.
-    clone.style.visibility = "hidden";
-    requestAnimationFrame(() => clone.remove());
+    // Frame 2: by now the style recalc has completed.  The real page
+    // is in its final visual state.  Hide the clone.
+    requestAnimationFrame(() => {
+      clone.style.visibility = "hidden";
+
+      // Frame 3: remove the (already invisible) clone from the DOM.
+      requestAnimationFrame(() => clone.remove());
+    });
   }, DURATION + 80);
 }
