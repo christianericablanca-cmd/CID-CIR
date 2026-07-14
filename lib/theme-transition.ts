@@ -19,50 +19,65 @@ export function animateThemeTransition(
   from: string,
   to: string
 ): void {
-  // 1. Switch to the NEW theme on <html>
+  // ── 0. Guaranteed full-coverage radius ──────────────────────────
+  const maxDist = Math.hypot(
+    Math.max(x, innerWidth - x),
+    Math.max(y, innerHeight - y),
+  );
+  // extra 10% for safety
+  const fullR = Math.ceil(maxDist * 1.1);
+
+  // ── 1. Switch html to the NEW theme ─────────────────────────────
   document.documentElement.classList.toggle("dark", to === "dark");
 
-  // 2. Snapshot the new theme's CSS variable values (they cascade from html)
+  // ── 2. Capture the NEW theme's CSS variable values ──────────────
   const computed = getComputedStyle(document.documentElement);
   const newVars: Record<string, string> = {};
   for (const v of THEME_VARS) {
     newVars[v] = computed.getPropertyValue(v).trim();
   }
 
-  // 3. Clone the body — DOM shape matches, but CSS vars still resolve at render time
+  // ── 3. Capture scroll position ──────────────────────────────────
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+
+  // ── 4. Clone the body ───────────────────────────────────────────
   const clone = document.body.cloneNode(true) as HTMLElement;
   clone
-    .querySelectorAll("script, form, video, audio, iframe, [contenteditable], [style*='z-index: 9999']")
+    .querySelectorAll(
+      "script, form, video, audio, iframe, [contenteditable], [style*='z-index: 9999']",
+    )
     .forEach((el) => el.remove());
 
-  // 4. Bake the NEW theme's CSS vars onto the clone's body element.
-  //    Because CSS custom properties cascade, every child inside the clone will
-  //    inherit these values regardless of what <html> says.
+  // ── 5. Bake the NEW theme's CSS vars onto the clone's body ──────
   for (const [key, val] of Object.entries(newVars)) {
     clone.style.setProperty(key, val);
   }
 
-  // 5. Switch <html> back to the OLD theme — the clone is now self-contained
+  // ── 6. Switch html back to the OLD theme ────────────────────────
   document.documentElement.classList.toggle("dark", from === "dark");
 
-  // 6. Pin the clone as a fixed overlay, clipped to nothing at the click point
+  // ── 7. Position the clone as a fixed overlay ────────────────────
   Object.assign(clone.style, {
     position: "fixed",
     inset: "0",
+    overflow: "hidden",
     zIndex: "9999",
     clipPath: `circle(0% at ${x}px ${y}px)`,
-    transition: `clip-path ${DURATION}ms cubic-bezier(0.4, 0, 0.2, 1)`,
+    transition: `clip-path ${DURATION}ms cubic-bezier(0.22, 1, 0.36, 1)`,
     pointerEvents: "none",
     willChange: "clip-path",
+    // Match the real page's scroll position so there's no jump
+    transform: `translate(-${scrollX}px, -${scrollY}px)`,
   });
 
   document.body.appendChild(clone);
 
-  // 7. Force a reflow then expand the circle — new theme scorches outward from the button
+  // ── 8. Force reflow then expand the circle ──────────────────────
   clone.getBoundingClientRect();
-  clone.style.clipPath = `circle(150% at ${x}px ${y}px)`;
+  clone.style.clipPath = `circle(${fullR}px at ${x}px ${y}px)`;
 
-  // 8. After animation, persist the theme and remove the clone
+  // ── 9. After animation, persist and clean up ────────────────────
   setTimeout(() => {
     document.documentElement.classList.toggle("dark", to === "dark");
     localStorage.setItem("cid-theme", to);
