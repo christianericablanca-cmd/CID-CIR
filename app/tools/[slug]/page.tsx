@@ -18,7 +18,7 @@ export function generateMetadata({
   const tool = getToolBySlug(params.slug);
   if (!tool) return { title: "Tool not found" };
   return {
-    title: `${tool.name} - CID Centralized Investigation Repository`,
+    title: `${tool.name} - CID — OSINT & Security Toolkit`,
     description: tool.description,
   };
 }

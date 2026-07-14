@@ -245,7 +245,7 @@ export default function HomePage() {
               </div>
               <div>
                 <p className="text-xs font-semibold leading-tight text-foreground">CIR</p>
-                <p className="text-[10px] leading-tight text-muted">CID Centralized Investigation Repository</p>
+                <p className="text-[10px] leading-tight text-muted">CID — OSINT & Security Toolkit</p>
               </div>
             </div>
           </div>
@@ -329,7 +329,7 @@ export default function HomePage() {
                 </div>
               </div>
               <h1 className="text-center text-2xl font-bold tracking-tight text-foreground">
-                CID Centralized Investigation Repository
+                CID — OSINT & Security Toolkit
               </h1>
               <p className="mt-3 text-center text-sm leading-relaxed text-muted">
                 Select a tool from either sidebar to begin. All processing happens locally in your browser.

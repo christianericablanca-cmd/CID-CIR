@@ -6,11 +6,12 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SearchProvider } from "@/components/search-context";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
+import { VersePopup } from "@/components/verse-popup";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "CID Centralized Investigation Repository",
+  title: "CID — OSINT & Security Toolkit",
   description:
     "Professional cybersecurity tools for investigators, DFIR analysts, penetration testers, privacy professionals, and security researchers.",
   keywords: [
@@ -39,6 +40,7 @@ export default function RootLayout({
               <Footer />
             </div>
             <Analytics />
+            <VersePopup />
           </SearchProvider>
         </ThemeProvider>
       </body>

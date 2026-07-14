@@ -4,7 +4,7 @@ import { CATEGORIES, TOOLS } from "@/lib/tools";
 import { Badge } from "@/components/ui/badge";
 
 export const metadata = {
-  title: "About - CID Centralized Investigation Repository",
+  title: "About - CID — OSINT & Security Toolkit",
 };
 
 export default function AboutPage() {
@@ -24,7 +24,7 @@ export default function AboutPage() {
         </div>
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            About CID Centralized Investigation Repository
+            About CID — OSINT & Security Toolkit
           </h1>
           <p className="mt-1.5 text-sm text-muted">
             A professional multi-tool platform for cyber investigation.
@@ -34,7 +34,7 @@ export default function AboutPage() {
 
       <div className="space-y-6 text-sm leading-relaxed text-muted">
         <p>
-          CID Centralized Investigation Repository is a modular, privacy-respecting collection
+          CID — OSINT & Security Toolkit is a modular, privacy-respecting collection
           of utilities designed for digital investigators, DFIR analysts, SOC
           analysts, penetration testers, OSINT researchers, and incident
           responders. The interface is modeled on the clean, serious aesthetic

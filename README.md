@@ -1,4 +1,4 @@
-# CID — Centralized Investigation Repository
+# CID — OSINT & Security Toolkit
 
 **A modular, privacy-first cybersecurity multi-tool platform for digital investigators, DFIR analysts, SOC operators, OSINT researchers, and threat intelligence professionals.**
 
