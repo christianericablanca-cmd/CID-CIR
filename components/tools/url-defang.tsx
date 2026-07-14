@@ -113,7 +113,7 @@ export function UrlDefangTool() {
         <div className="relative">
           <div
             className={cn(
-              "min-h-[336px] w-full rounded-md border border-border bg-card px-3 py-2 text-sm leading-relaxed text-foreground break-all font-mono",
+              "min-h-[336px] w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground break-all font-mono",
               !output && "flex items-center justify-center text-muted/50"
             )}
           >

@@ -57,7 +57,7 @@ export function OutputArea({
       </div>
       <div
         className={cn(
-          "min-h-[120px] w-full overflow-auto rounded-md border border-border bg-card p-3 text-sm leading-relaxed text-foreground font-mono",
+          "min-h-[120px] w-full overflow-auto rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground font-mono",
           !value && "flex items-center justify-center text-muted/50"
         )}
       >
