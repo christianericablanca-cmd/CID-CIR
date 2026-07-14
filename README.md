@@ -1,38 +1,110 @@
-# CID Centralized Investigation Repository (CID-CIR)
+# CID — Centralized Investigation Repository
 
-A modular, dark-mode-first cybersecurity multi-tool platform for investigators, DFIR analysts, OSINT researchers, and threat intelligence professionals.
+**A modular, privacy-first cybersecurity multi-tool platform for digital investigators, DFIR analysts, SOC operators, OSINT researchers, and threat intelligence professionals.**
 
-## Categories
+Built with Next.js 16, TypeScript, and TailwindCSS. All processing runs client-side — no data leaves your browser.
+
+---
+
+## Categories & Tools
 
 ### Encoding & Decoding
-URL Defanger, URL Refanger, Base64, URL Encode, JWT Decoder, JSON Formatter, XML Formatter
+| Tool | Type |
+|---|---|
+| URL Defanger / Refanger | Built-in |
+| Base64 Encode / Decode | Built-in |
+| URL Encode / Decode | Built-in |
+| JWT Decoder | Built-in |
+| JSON / XML Formatter | Built-in |
 
 ### Hash & Crypto
-Hash Generator, File Hash, Hash Comparator, Password Strength
+| Tool | Type |
+|---|---|
+| Hash Generator (MD5, SHA-1, SHA-256/384/512) | Built-in |
+| File Hash Calculator | Built-in |
+| Hash Comparator | Built-in |
+| Password Strength Analyzer | Built-in |
 
 ### Domain & DNS
-WHOIS, DNS Records, ASN Lookup, Reverse IP, MXToolbox, DNSViz, crt.sh, Subdomain Finder
+| Tool | Type |
+|---|---|
+| WHOIS Lookup | External |
+| DNS Records | External |
+| ASN Lookup | External |
+| Reverse IP | External |
+| MXToolbox | External |
+| DNSViz | External |
+| crt.sh | External |
+| Subdomain Finder | External |
+| Is It Down Right Now | External |
+| **Down Checker** | **Built-in** |
+| **Port Scanner** | **Built-in** |
 
 ### Website Analysis
-SecurityHeaders.com, Mozilla Observatory, SSL Labs, BuiltWith, Web Check
+| Tool | Type |
+|---|---|
+| SecurityHeaders.com | External |
+| Mozilla Observatory | External |
+| SSL Labs | External |
+| BuiltWith | External |
+| Web Check | External |
 
 ### Threat Intelligence
-Shodan, VirusTotal, URLScan, AbuseIPDB, GreyNoise, Wayback Machine, Censys
+| Tool | Type |
+|---|---|
+| Shodan | External |
+| VirusTotal | External |
+| URLScan.io | External |
+| AbuseIPDB | External |
+| GreyNoise | External |
 
 ### OSINT
-Google Dork Generator
+| Tool | Type |
+|---|---|
+| Google Dork Generator | Built-in |
+| Wayback Machine | External |
+| Censys | External |
 
 ### Monitoring
-Ransomware.live (API integration), Dark Forums, Breached, PwnForums, Femboy Forum
+| Tool | Type |
+|---|---|
+| **Ransomware.live** (API: country victims, group details, TTPs) | **Built-in** |
+| Dark Forums | External |
+| Breached | External |
+| PwnForums | External |
+| Femboy Forum | External |
+| VeCert Forums | External |
+
+---
+
+## Features
+
+- **Dual-sidebar layout** — tools organized by category on left and right panels
+- **Live reachability indicators** — green/red/gray LEDs show external tool status; uncertain results offer manual retry
+- **Ransomware.live integration** — query ransomware victims by country or group; displays locations, tools, and MITRE ATT&CK TTPs with expandable details
+- **Port Scanner** — real TCP scan of 24 common ports from server; expand each result for service description, use cases, and attack vectors
+- **Down Checker** — server-side HTTP check with status code, response time, and redirect tracking
+- **Client-side processing** — all built-in tools run entirely in the browser; no data is sent to any server
+- **Dark mode first** — with functional light/dark toggle
+- **Mobile responsive** — collapsible drawer with full tool access on small screens
+- **Keyboard search** — filter tools by name, description, or category
+- **External tool cards** — each external link shows availability status and one-click open
+
+---
 
 ## Tech Stack
 
-- **Framework:** Next.js 16 (App Router)
-- **Language:** TypeScript
-- **Styling:** TailwindCSS + shadcn/ui
-- **Animation:** Framer Motion
-- **Icons:** Lucide React
-- **Deployment:** Vercel
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript |
+| Styling | TailwindCSS + shadcn/ui |
+| Animation | Framer Motion |
+| Icons | Lucide React |
+| Analytics | Vercel Web Analytics |
+| Deployment | Vercel |
+
+---
 
 ## Getting Started
 
@@ -43,38 +115,28 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Build
+### Build
 
 ```bash
 npm run build
 ```
 
-All built-in tools run entirely client-side — no data leaves your browser.
+### Deploy
 
-## Usage
+Push to GitHub — Vercel auto-deploys on every commit to `main`.
 
-### Built-in Tools
-Select any tool from the left or right sidebar. Results appear in the center workspace. All processing is local.
+---
 
-### External Tools
-Click an external tool card to open the service in a new tab. These are third-party sites linked for convenience.
+## Security & Privacy
 
-### Ransomware.live API
-1. Click the **Ransomware.live** tool under Monitoring
-2. Choose **By Country** (e.g. `PH` for Philippines) or **By Group** (e.g. `LockBit`, `Qilin`)
-3. Click **Query** — results render as a table or structured report
-4. Group details include locations, tools, and MITRE ATT&CK TTPs with expandable sections
+- No user accounts, no databases, no server-side storage
+- No tracking cookies (except theme preference)
+- Built-in tools process everything locally in the browser
+- External tools open in new tabs — your activity is subject to their respective privacy policies
+- All communications over HTTPS
 
-### Search
-Use the search bar in the top navbar or the sidebar filter to quickly find any tool by name, description, or category.
-
-### Theme
-Toggle dark/light mode using the sun/moon icon in the top-right corner.
-
-## Deployment
-
-Push to GitHub → Vercel auto-deploys on every commit to `main`.
+---
 
 ## License
 
-MIT — For authorized security research and investigation use only.
+MIT — For authorized security research and investigation use only. Always comply with applicable laws and regulations.
