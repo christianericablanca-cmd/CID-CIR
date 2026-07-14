@@ -5,21 +5,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, X } from "lucide-react";
 import { randomVerse } from "@/lib/verses";
 
-const LS_KEY = "cid-dds-shown";
-
 export function VersePopup() {
   const [show, setShow] = React.useState(false);
   const verse = React.useRef(randomVerse());
 
   React.useEffect(() => {
-    const shown = localStorage.getItem(LS_KEY);
-    if (!shown) {
-      const timer = setTimeout(() => {
-        setShow(true);
-        localStorage.setItem(LS_KEY, "true");
-      }, 800);
-      return () => clearTimeout(timer);
-    }
+    const timer = setTimeout(() => {
+      setShow(true);
+    }, 800);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
