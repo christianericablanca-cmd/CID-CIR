@@ -605,7 +605,7 @@ const ZENMUX_URL = "https://zenmux.ai/api/v1/chat/completions";
 
 const IS_VERCEL = process.env.VERCEL === "1";
 
-async function aiWebSearch(
+export async function aiWebSearch(
   query: string,
   maxResults: number
 ): Promise<string | null> {

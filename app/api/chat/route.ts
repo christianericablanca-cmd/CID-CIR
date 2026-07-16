@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TOOL_DEFINITIONS, executeToolCall } from "@/lib/ai-tools";
+import { TOOL_DEFINITIONS, executeToolCall, aiWebSearch } from "@/lib/ai-tools";
 
 interface ParsedToolCall {
   name: string;
@@ -198,8 +198,27 @@ export async function POST(req: NextRequest) {
   const timeout = setTimeout(() => controller.abort(), 120000);
 
   try {
-    // Phase 1: Non-streaming call (may trigger tool calls)
+    // Phase 1: If tools enabled, do an automatic web search with the user's
+    // last message so the model has real-time context without needing to
+    // output a tool call itself.
     let conversation = [...messagesWithSystem];
+
+    if (toolsEnabled && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1]?.content || "";
+      if (lastMsg.length > 3) {
+        const autoSearchResult = await aiWebSearch(lastMsg, 5);
+        if (autoSearchResult) {
+          conversation.push({
+            role: "system",
+            content:
+              "[The system automatically searched the web for the user's query. Here are the results — use them if relevant to your answer, otherwise ignore them.]\n\n" +
+              autoSearchResult,
+          });
+        }
+      }
+    }
+
+    // Phase 1b: Non-streaming call (may also trigger tool calls)
     let res = await callZenmux(conversation, apiKey, toolsEnabled, controller.signal);
 
     if (!res.ok) {
@@ -224,7 +243,13 @@ export async function POST(req: NextRequest) {
       const hasStructuredCalls = msg?.tool_calls && msg.tool_calls.length > 0;
       const hasTextCalls = textCalls.length > 0;
 
-      if (!hasStructuredCalls && !hasTextCalls) break;
+      if (!hasStructuredCalls && !hasTextCalls) {
+        // Debug: first iteration with tools enabled but no tool call detected
+        if (loopCount === 0 && toolsEnabled) {
+          console.log("[CID AI] No tool call detected in model response. Content preview:", msg?.content?.slice(0, 200));
+        }
+        break;
+      }
 
       loopCount++;
 
