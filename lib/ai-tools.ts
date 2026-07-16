@@ -603,12 +603,15 @@ async function execWebFetch(
 
 const ZENMUX_URL = "https://zenmux.ai/api/v1/chat/completions";
 
-const IS_VERCEL = process.env.VERCEL === "1";
-
 export async function aiWebSearch(
   query: string,
   maxResults: number
 ): Promise<string | null> {
+  // Try DDG Instant Answer API first (fast, no key needed)
+  const ddgResult = await ddgWebSearch(query, maxResults);
+  if (ddgResult) return ddgResult;
+
+  // Fallback: use ZenMux as a search tool (slower but works everywhere)
   const apiKey = process.env.ZENMUX_API_KEY;
   if (!apiKey) return null;
   const controller = new AbortController();
@@ -649,50 +652,47 @@ export async function aiWebSearch(
 
 async function ddgWebSearch(
   query: string,
-  maxResults: number
+  _maxResults: number
 ): Promise<string | null> {
+  // Use DDG lite API for lightweight, parseable results
   const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), 8000);
+  const t = setTimeout(() => controller.abort(), 6000);
   try {
-    const res = await fetch(
-      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
-      {
-        signal: controller.signal,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-          Accept: "text/html",
-        },
-      }
-    );
+    const res = await fetch("https://lite.duckduckgo.com/lite/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+      body: `q=${encodeURIComponent(query)}`,
+      signal: controller.signal,
+    });
     clearTimeout(t);
+    if (!res.ok) return null;
     const html = await res.text();
+    // DDG lite returns a simple table-based layout
     const results: string[] = [];
-    const linkRegex =
-      /<a[^>]+class="[^"]*result__a[^"]*"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
-    const snippetRegex =
-      /<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
-    const links: string[] = [];
-    const titles: string[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = linkRegex.exec(html)) !== null && links.length < maxResults) {
-      let href = m[1].replace(/&amp;/g, "&");
-      const rdMatch = href.match(/uddg=([^&]+)/);
-      if (rdMatch) href = decodeURIComponent(rdMatch[1]);
-      links.push(href);
-      titles.push(m[2].replace(/<[^>]+>/g, "").trim());
-    }
-    const snippets: string[] = [];
-    while ((m = snippetRegex.exec(html)) !== null && snippets.length < maxResults) {
-      snippets.push(m[1].replace(/<[^>]+>/g, "").trim());
-    }
-    for (let i = 0; i < Math.min(links.length, maxResults); i++) {
-      results.push(
-        `${i + 1}. ${titles[i] || "(no title)"}\n   URL: ${links[i]}\n   ${snippets[i] || ""}`
-      );
+    const rowRegex = /<tr>[\s\S]*?<\/tr>/gi;
+    let rowMatch: RegExpExecArray | null;
+    let inResults = false;
+    while ((rowMatch = rowRegex.exec(html)) !== null) {
+      const row = rowMatch[0];
+      // Skip header rows and empty rows
+      if (row.includes('class="result-header"')) { inResults = true; continue; }
+      if (!inResults) continue;
+      if (row.includes('class="result--more"')) break;
+      const linkMatch = /<a[^>]+href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i.exec(row);
+      const snippetMatch = /<td class="result-snippet">([\s\S]*?)<\/td>/i.exec(row);
+      if (!linkMatch) continue;
+      const url = linkMatch[1].includes("http") ? linkMatch[1] : `https://${linkMatch[1]}`;
+      const title = linkMatch[2].replace(/<[^>]+>/g, "").trim();
+      const snippet = snippetMatch ? snippetMatch[1].replace(/<[^>]+>/g, "").trim() : "";
+      if (title && url) {
+        results.push(`${results.length + 1}. ${title}\n   URL: ${url}\n   ${snippet}`);
+      }
     }
     if (results.length === 0) return null;
-    return `Search results for "${query}":\n\n${results.join("\n\n")}`;
+    return `Search results for "${query}":\n\n${results.slice(0, 10).join("\n\n")}`;
   } catch {
     clearTimeout(t);
     return null;
@@ -710,29 +710,14 @@ async function execWebSearch(
     return errorResult(toolCallId, "web_search", "Query is required.");
 
   const maxResults = Math.min(Math.max(Number(args.max_results) || 5, 1), 10);
-
-  // On Vercel: skip DDG (often blocked), go straight to AI-based search
-  // Locally: try DDG first, fall back to AI
-  let result: string | null = null;
-  let source = "";
-
-  if (!IS_VERCEL) {
-    result = await ddgWebSearch(query, maxResults);
-    if (result) source = "DuckDuckGo";
-  }
-
-  if (!result) {
-    result = await aiWebSearch(query, maxResults);
-    if (result) source = "AI-enhanced search";
-  }
+  const result = await aiWebSearch(query, maxResults);
 
   if (result) {
-    const note = source ? `\n\n(Source: ${source})` : "";
     return {
       tool_call_id: toolCallId,
       role: "tool",
       name: "web_search",
-      content: result + note,
+      content: result,
     };
   }
 
