@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TOOL_DEFINITIONS, executeToolCall } from "@/lib/ai-tools";
+import { TOOL_DEFINITIONS, executeToolCall, webSearch } from "@/lib/ai-tools";
 
 export const maxDuration = 60;
 
@@ -48,8 +48,15 @@ You have access to these tools:
 - \`web_fetch\` — fetch a URL's content
 - \`web_search\` — search the web
 
+## AUTO-SEARCH RESULTS
+The system has ALREADY searched public databases (ORCID, Wikipedia, GitHub) before you respond. Look for a system message labeled "[Auto-search results]" above. Read those results carefully — they contain real, verified data from public APIs.
+
+If auto-search results are present, use them to answer the user. Do NOT call \`web_search\` again unless you need more specific detail.
+
+If auto-search results are NOT present (e.g., the search did not complete), you may call \`web_search\` yourself using the format below.
+
 ## TOOL CALLING FORMAT — CRITICAL
-You can call tools to get real-time information. To call a tool, output EXACTLY this XML format — nothing else for that turn:
+To call a tool, output EXACTLY this XML format — nothing else for that turn:
 
 <tool_call>
 <function=web_search>
@@ -58,24 +65,22 @@ You can call tools to get real-time information. To call a tool, output EXACTLY 
 </function>
 </tool_call>
 
-Available tools and their parameters:
-- \`web_search(query, max_results)\` — search the web for current information. Use this when the user asks about a person, organization, event, or anything that may be outside your training data.
-- \`web_fetch(url, format)\` — fetch the content of a specific URL.
-- \`read_file(path)\` — read a file from the local filesystem.
-- \`list_directory(path, max_depth)\` — list files in a directory.
-- \`write_file(path, content)\` — write a file.
-- \`delete_file(path)\` — delete a file.
-- \`copy_file(source, destination)\` — copy files or directories.
-- \`run_command(command, workdir, timeout)\` — execute a shell command.
+Available tools:
+- \`web_search(query, max_results)\` — search the web (ORCID, Wikipedia, GitHub)
+- \`web_fetch(url, format)\` — fetch a URL's content
+- \`read_file(path)\` — read files
+- \`list_directory(path, max_depth)\` — list directory
+- \`write_file(path, content)\` — write files
+- \`delete_file(path)\` — delete files
+- \`copy_file(source, destination)\` — copy files
+- \`run_command(command, workdir, timeout)\` — run shell commands
 
 ## SEARCH RULES — STRICT
-1. When the user asks you to find information about a person (OSINT, people lookup, background check), you MUST start by calling \`web_search\` before you respond. Do NOT try to answer from memory.
-2. After calling \`web_search\`, the search results will be shown to you. Read them carefully and use them to answer the user.
-3. If you need more details, call \`web_search\` again with a refined query, or call \`web_fetch\` to read a specific URL.
-4. NEVER invent, speculate, or fabricate information. Only state what is in the search results.
-5. NEVER describe what search methods you WOULD use. Just DO the search by outputting a tool call.
-6. NEVER say "I searched the web" — the search is done by the tool, not by you. Just present the results.
-7. Format answers cleanly with markdown and cite sources (URLs) when possible.
+1. When auto-search results are provided, read them and answer immediately. Do NOT call tools again unless you need more detail.
+2. NEVER invent, speculate, or fabricate information. Only state what is in the search results.
+3. NEVER describe what search methods you WOULD use. Just present the results.
+4. NEVER say "I searched the web" — the search was done by the system. Just present the results.
+5. Format answers cleanly with markdown and cite sources (URLs) when possible.
 
 Current date: ${new Date().toISOString().split("T")[0]}`;
 
@@ -168,6 +173,27 @@ export async function POST(req: NextRequest) {
 
   try {
     let conversation = [...messagesWithSystem];
+
+    // Auto-search using reliable public APIs (ORCID, Wikipedia, GitHub)
+    if (toolsEnabled && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1]?.content || "";
+      if (lastMsg.length > 5) {
+        try {
+          const searchResult = await Promise.race([
+            webSearch(lastMsg, 5),
+            new Promise<string | null>((r) => setTimeout(() => r(null), 5000)),
+          ]) as string | null;
+          if (searchResult) {
+            conversation.push({
+              role: "system",
+              content: "[Auto-search results — read these carefully and use them to answer the user. They are from live public databases (ORCID, Wikipedia, GitHub).]\n\n" + searchResult,
+            });
+          }
+        } catch {
+          // Auto-search failed silently; model can still call web_search tool
+        }
+      }
+    }
 
     let res = await callZenmux(conversation, apiKey, toolsEnabled, controller.signal);
 

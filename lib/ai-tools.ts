@@ -203,58 +203,200 @@ export const TOOL_DEFINITIONS = [
 const ZENMUX_URL = "https://zenmux.ai/api/v1/chat/completions";
 
 export async function webSearch(query: string, maxResults: number): Promise<string | null> {
-  // Try Bing first (may work on Vercel where DDG is blocked)
-  const bingResult = await bingSearch(query, maxResults);
-  if (bingResult) return bingResult;
+  const allParts: string[] = [];
 
-  // Fallback: use ZenMux model knowledge
+  // Run reliable public APIs in parallel — no API keys needed
+  await Promise.all([
+    searchORCID(query, maxResults).then(r => {
+      if (r) allParts.push(`--- ORCID Academic Profile ---\n${r}`);
+    }),
+    searchWikipedia(query, maxResults).then(r => {
+      if (r) allParts.push(`--- Wikipedia ---\n${r}`);
+    }),
+    searchGitHub(query, maxResults).then(r => {
+      if (r) allParts.push(`--- GitHub ---\n${r}`);
+    }),
+  ]);
+
+  if (allParts.length > 0) {
+    return `Search results for "${query}":\n\n${allParts.join("\n\n")}`;
+  }
+
+  // Fallback: ZenMux model knowledge
   return zenmuxKnowledgeSearch(query, maxResults);
 }
 
-async function bingSearch(query: string, maxResults: number): Promise<string | null> {
+async function fetchWithTimeout(url: string, opts: Record<string, any>, ms: number): Promise<Response> {
+  return Promise.race([
+    fetch(url, { ...opts, headers: { ...opts.headers, Connection: "close" } }),
+    new Promise<Response>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+  ]) as Promise<Response>;
+}
+
+// ── ORCID public API (no auth needed for basic search) ──────────────
+
+async function searchORCID(query: string, maxResults: number): Promise<string | null> {
   try {
-    const res = await Promise.race([
-      fetch(`https://www.bing.com/search?q=${encodeURIComponent(query)}`, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          Accept: "text/html",
-          Connection: "close",
-        },
-      }),
-      new Promise<Response>((_, reject) => setTimeout(() => reject(new Error("timeout")), 4000)),
-    ]) as Response;
-    if (!res.ok) return null;
-    const html = await Promise.race([
-      res.text(),
-      new Promise<string>((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
-    ]) as string;
-    const results: string[] = [];
-    const linkRegex = /<a[^>]+href="(https?:\/\/(?!.*bing.com)[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
-    let m: RegExpExecArray | null;
-    while ((m = linkRegex.exec(html)) !== null && results.length < maxResults) {
-      const title = m[2].replace(/<[^>]+>/g, "").trim();
-      if (title.length > 3) {
-        results.push(`${results.length + 1}. ${title}\n   URL: ${m[1]}`);
+    const searchRes = await fetchWithTimeout(
+      `https://pub.orcid.org/v3.0/search?q=${encodeURIComponent(query)}`,
+      { headers: { Accept: "application/json", "User-Agent": "CID-OSINT/1.0" } },
+      4000
+    );
+    if (!searchRes.ok) return null;
+    const searchData = await searchRes.json() as any;
+    const records = searchData?.result || [];
+    if (records.length === 0) return null;
+
+    const lines: string[] = [];
+    for (let i = 0; i < Math.min(records.length, maxResults); i++) {
+      const orcidPath = records[i]?.["orcid-identifier"]?.path;
+      if (!orcidPath) continue;
+
+      // Fetch full record
+      const recRes = await fetchWithTimeout(
+        `https://pub.orcid.org/v3.0/${orcidPath}/record`,
+        { headers: { Accept: "application/json", "User-Agent": "CID-OSINT/1.0" } },
+        3000
+      );
+      if (!recRes.ok) continue;
+      const rec = await recRes.json() as any;
+
+      const name = rec?.person?.name;
+      const bio = rec?.person?.biography?.content;
+      const given = name?.["given-names"]?.value || "";
+      const family = name?.["family-name"]?.value || "";
+
+      lines.push(`${i + 1}. ${given} ${family}`);
+      lines.push(`   ORCID: https://orcid.org/${orcidPath}`);
+      if (bio) lines.push(`   Bio: ${bio}`);
+
+      // Employment
+      const emps = rec?.["activities-summary"]?.employments?.["affiliation-group"] || [];
+      for (const eg of emps) {
+        const sum = eg?.summaries?.[0]?.["employment-summary"];
+        if (sum) {
+          const org = sum?.organization?.name || "";
+          const role = sum?.["role-title"] || "";
+          const city = sum?.organization?.address?.city || "";
+          const region = sum?.organization?.address?.region || "";
+          if (org) lines.push(`   ${role ? role + " at " : ""}${org} (${city}, ${region})`);
+        }
+      }
+
+      // Education
+      const edus = rec?.["activities-summary"]?.educations?.["affiliation-group"] || [];
+      for (const eg of edus) {
+        const sum = eg?.summaries?.[0]?.["education-summary"];
+        if (sum) {
+          const deg = sum?.["role-title"] || "";
+          const org = sum?.organization?.name || "";
+          const start = sum?.["start-date"]?.year?.value || "";
+          const end = sum?.["end-date"]?.year?.value || "";
+          if (deg) lines.push(`   ${deg} — ${org} (${start}–${end})`);
+        }
+      }
+
+      // Works
+      const works = rec?.["activities-summary"]?.works?.group || [];
+      for (let w = 0; w < Math.min(works.length, 3); w++) {
+        const ws = works[w]?.["work-summary"]?.[0];
+        if (ws) {
+          const title = ws?.title?.title?.value || "";
+          const doi = ws?.url?.value || ws?.["external-ids"]?.["external-id"]?.[0]?.["external-id-value"] || "";
+          if (title) {
+            lines.push(`   Publication: "${title}"`);
+            if (doi) lines.push(`     ${doi}`);
+          }
+        }
       }
     }
-    if (results.length === 0) return null;
-    return `Search results for "${query}":\n\n${results.join("\n\n")}`;
+
+    return lines.length > 0 ? lines.join("\n") : null;
   } catch {
     return null;
   }
 }
 
+// ── Wikipedia public API ────────────────────────────────────────────
+
+async function searchWikipedia(query: string, maxResults: number): Promise<string | null> {
+  try {
+    const searchRes = await fetchWithTimeout(
+      `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=${maxResults}&format=json&redirects=resolve`,
+      { headers: { "User-Agent": "CID-OSINT/1.0" } },
+      3000
+    );
+    if (!searchRes.ok) return null;
+    const data = await searchRes.json() as any;
+    const titles = data?.[1] || [];
+    const urls = data?.[3] || [];
+    if (titles.length === 0) return null;
+
+    const lines: string[] = [];
+    for (let i = 0; i < titles.length; i++) {
+      lines.push(`${i + 1}. ${titles[i]}`);
+      if (urls[i]) lines.push(`   URL: ${urls[i]}`);
+
+      // Fetch summary
+      try {
+        const sumRes = await fetchWithTimeout(
+          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(titles[i])}`,
+          { headers: { "User-Agent": "CID-OSINT/1.0" } },
+          2000
+        );
+        if (sumRes.ok) {
+          const sum = await sumRes.json() as any;
+          const extract = sum?.extract?.replace(/\n/g, " ").slice(0, 300) || "";
+          if (extract) lines.push(`   ${extract}`);
+        }
+      } catch { /* skip summary */ }
+    }
+    return lines.join("\n");
+  } catch {
+    return null;
+  }
+}
+
+// ── GitHub public API ───────────────────────────────────────────────
+
+async function searchGitHub(query: string, maxResults: number): Promise<string | null> {
+  try {
+    const searchRes = await fetchWithTimeout(
+      `https://api.github.com/search/users?q=${encodeURIComponent(query)}+in:name&per_page=${maxResults}`,
+      { headers: { Accept: "application/vnd.github.v3+json", "User-Agent": "CID-OSINT/1.0" } },
+      4000
+    );
+    if (!searchRes.ok) return null;
+    const data = await searchRes.json() as any;
+    const users = data?.items || [];
+    if (users.length === 0) return null;
+
+    const lines: string[] = [];
+    for (let i = 0; i < users.length; i++) {
+      const u = users[i];
+      lines.push(`${i + 1}. ${u.login} (${u.type})`);
+      lines.push(`   URL: ${u.html_url}`);
+      if (u.score) lines.push(`   Score: ${u.score}`);
+    }
+    return lines.join("\n");
+  } catch {
+    return null;
+  }
+}
+
+// ── ZenMux knowledge fallback ───────────────────────────────────────
+
 async function zenmuxKnowledgeSearch(query: string, maxResults: number): Promise<string | null> {
   const apiKey = process.env.ZENMUX_API_KEY;
   if (!apiKey) return null;
   try {
-    const res = await Promise.race([
-      fetch(ZENMUX_URL, {
+    const res = await fetchWithTimeout(
+      ZENMUX_URL,
+      {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
-          Connection: "close",
         },
         body: JSON.stringify({
           model: "stepfun/step-3.7-flash-free",
@@ -273,9 +415,9 @@ async function zenmuxKnowledgeSearch(query: string, maxResults: number): Promise
           ],
           stream: false,
         }),
-      }),
-      new Promise<Response>((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
-    ]) as Response;
+      },
+      5000
+    );
     if (!res.ok) return null;
     const data = await res.json();
     const text = data.choices?.[0]?.message?.content || "";
