@@ -72,6 +72,96 @@ pre {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+/* ── AI Chat ──────────────────────────────────────────────────────── */
+
+/* AI Chat code block styling overrides for highlight.js */
+.ai-chat-message .hljs {
+  background: transparent !important;
+  color: inherit;
+}
+.ai-chat-message .hljs-keyword,
+.ai-chat-message .hljs-selector-tag,
+.ai-chat-message .hljs-literal,
+.ai-chat-message .hljs-section,
+.ai-chat-message .hljs-link { color: #c678dd; }
+.ai-chat-message .hljs-string,
+.ai-chat-message .hljs-title,
+.ai-chat-message .hljs-name,
+.ai-chat-message .hljs-type,
+.ai-chat-message .hljs-attribute,
+.ai-chat-message .hljs-symbol,
+.ai-chat-message .hljs-bullet,
+.ai-chat-message .hljs-addition,
+.ai-chat-message .hljs-variable,
+.ai-chat-message .hljs-template-tag,
+.ai-chat-message .hljs-template-variable { color: #98c379; }
+.ai-chat-message .hljs-comment,
+.ai-chat-message .hljs-quote,
+.ai-chat-message .hljs-deletion,
+.ai-chat-message .hljs-meta { color: #5c6370; }
+.ai-chat-message .hljs-number,
+.ai-chat-message .hljs-regexp,
+.ai-chat-message .hljs-literal,
+.ai-chat-message .hljs-built_in,
+.ai-chat-message .hljs-builtin-name { color: #d19a66; }
+.ai-chat-message .hljs-attr,
+.ai-chat-message .hljs-params { color: #d19a66; }
+.ai-chat-message .hljs-selector-class { color: #e5c07b; }
+.ai-chat-message .hljs-function .hljs-keyword { color: #61afef; }
+.ai-chat-message .hljs-function .hljs-title { color: #61afef; }
+.ai-chat-message .hljs-tag { color: #e06c75; }
+
+/* Prose overrides for markdown in chat */
+.ai-chat-message ul,
+.ai-chat-message ol {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+.ai-chat-message li {
+  margin: 0.25rem 0;
+}
+.ai-chat-message p {
+  margin: 0.5rem 0;
+}
+.ai-chat-message p:first-child { margin-top: 0; }
+.ai-chat-message p:last-child { margin-bottom: 0; }
+.ai-chat-message h1,
+.ai-chat-message h2,
+.ai-chat-message h3,
+.ai-chat-message h4 {
+  margin: 0.75rem 0 0.375rem;
+  font-weight: 600;
+}
+.ai-chat-message h1 { font-size: 1.125rem; }
+.ai-chat-message h2 { font-size: 1rem; }
+.ai-chat-message h3 { font-size: 0.9375rem; }
+.ai-chat-message blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.75rem;
+  margin: 0.5rem 0;
+  color: var(--muted);
+}
+.ai-chat-message table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+}
+.ai-chat-message th,
+.ai-chat-message td {
+  border: 1px solid var(--border);
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+  font-size: 0.8125rem;
+}
+.ai-chat-message th {
+  background: var(--secondary);
+  font-weight: 600;
+}
+.ai-chat-message hr {
+  margin: 0.75rem 0;
+  border-color: var(--border);
+}
+
 /* ── View Transition: circle reveal from click point ────────────── */
 @keyframes circle-grow {
   0%   { clip-path: circle(0%    at var(--click-x, 50%) var(--click-y, 50%)); }

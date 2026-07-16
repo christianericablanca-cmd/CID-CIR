@@ -1,6 +1,7 @@
 import {
   Activity,
   Binary,
+  Bot,
   Boxes,
   Braces,
   Code2,
@@ -545,6 +546,16 @@ export const TOOLS: ToolDef[] = [
     url: "https://analyzer.vecert.io/forums",
     icon: MessageCircle,
     scope: "External",
+  },
+  {
+    slug: "ai-chat",
+    name: "AI Chat",
+    description: "Chat with an AI assistant for OSINT, cybersecurity questions, and general knowledge.",
+    category: "osint",
+    type: "builtin",
+    route: builtin("ai-chat"),
+    icon: Bot,
+    scope: "Built-in",
   },
 ];
 

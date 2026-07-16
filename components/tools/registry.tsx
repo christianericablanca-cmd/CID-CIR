@@ -20,6 +20,7 @@ import { GoogleDorkTool } from "@/components/tools/google-dork";
 import { RansomwareLiveTool } from "@/components/tools/ransomware-live";
 import { DownCheckerTool } from "@/components/tools/down-checker";
 import { PortScannerTool } from "@/components/tools/port-scanner";
+import { AiChatTool } from "@/components/tools/ai-chat";
 
 export const TOOL_REGISTRY: Record<string, ComponentType> = {
   "url-defang": UrlDefangTool,
@@ -42,4 +43,5 @@ export const TOOL_REGISTRY: Record<string, ComponentType> = {
   "ransomware-live": RansomwareLiveTool,
   "down-checker": DownCheckerTool,
   "port-scanner": PortScannerTool,
+  "ai-chat": AiChatTool,
 };
