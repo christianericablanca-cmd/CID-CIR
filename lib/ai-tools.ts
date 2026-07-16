@@ -654,30 +654,35 @@ async function ddgWebSearch(
   query: string,
   _maxResults: number
 ): Promise<string | null> {
-  // Use DDG lite API for lightweight, parseable results
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), 6000);
+  // Race the fetch against a timeout (AbortController unreliable during connection)
+  const timeoutMs = 5000;
   try {
-    const res = await fetch("https://lite.duckduckgo.com/lite/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-      body: `q=${encodeURIComponent(query)}`,
-      signal: controller.signal,
-    });
-    clearTimeout(t);
+    const res = (await Promise.race([
+      fetch("https://lite.duckduckgo.com/lite/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+        body: `q=${encodeURIComponent(query)}`,
+      }),
+      new Promise<Response>((_, reject) =>
+        setTimeout(() => reject(new Error("ddg timeout")), timeoutMs)
+      ),
+    ])) as Response;
     if (!res.ok) return null;
-    const html = await res.text();
-    // DDG lite returns a simple table-based layout
+    const html = await Promise.race([
+      res.text(),
+      new Promise<string>((_, reject) =>
+        setTimeout(() => reject(new Error("ddg text timeout")), 5000)
+      ),
+    ]) as string;
     const results: string[] = [];
     const rowRegex = /<tr>[\s\S]*?<\/tr>/gi;
     let rowMatch: RegExpExecArray | null;
     let inResults = false;
     while ((rowMatch = rowRegex.exec(html)) !== null) {
       const row = rowMatch[0];
-      // Skip header rows and empty rows
       if (row.includes('class="result-header"')) { inResults = true; continue; }
       if (!inResults) continue;
       if (row.includes('class="result--more"')) break;
@@ -694,7 +699,6 @@ async function ddgWebSearch(
     if (results.length === 0) return null;
     return `Search results for "${query}":\n\n${results.slice(0, 10).join("\n\n")}`;
   } catch {
-    clearTimeout(t);
     return null;
   }
 }

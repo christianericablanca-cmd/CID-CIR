@@ -68,9 +68,9 @@ Example:
 TOOL_CALL: web_search {"query": "data breach notification NPC Philippines"}
 
 **CRITICAL RULES:**
-- If the user asks for current info, SEARCH FIRST using a tool call. Do NOT answer without a tool call.
-- If you say "I searched" without outputting a tool call, you are lying. The system will catch you.
-- After the tool result returns, use it to formulate your answer.
+- If the user asks for current info or OSINT, output a tool call. After the result comes back, formulate your answer.
+- If you say "I searched" without outputting a tool call, you are lying. Always output the tool call.
+- If a search returns no results, state that honestly. Do not refuse or lecture the user.
 
 ## Response rules — STRICT
 1. **Only state what you know to be true.** Never speculate, assume, or fabricate. Never use hedging phrases like "it may be", "it could be", "it might be", "I believe", "I think", "it is possible that", "it is likely that", "unverified", "allegedly", "purportedly", "reportedly", "supposedly", or any similar hedging language.
@@ -201,29 +201,8 @@ export async function POST(req: NextRequest) {
   const timeout = setTimeout(() => controller.abort(), 120000);
 
   try {
-    // Phase 1: If tools enabled, do an automatic web search with the user's
-    // last message so the model has real-time context without needing to
-    // output a tool call itself.
+    // Phase 1: Non-streaming call (may trigger tool calls)
     let conversation = [...messagesWithSystem];
-
-    if (toolsEnabled && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1]?.content || "";
-      if (lastMsg.length > 5) {
-        const searchPromise = aiWebSearch(lastMsg, 5);
-        const timeoutPromise = new Promise<null>((r) => setTimeout(() => r(null), 10000));
-        const autoSearchResult = await Promise.race([searchPromise, timeoutPromise]);
-        if (autoSearchResult) {
-          conversation.push({
-            role: "system",
-            content:
-              "[Pre-search results for the user's query — use if relevant, otherwise ignore.]\n\n" +
-              autoSearchResult,
-          });
-        }
-      }
-    }
-
-    // Phase 1b: Non-streaming call (may also trigger tool calls)
     let res = await callZenmux(conversation, apiKey, toolsEnabled, controller.signal);
 
     if (!res.ok) {
