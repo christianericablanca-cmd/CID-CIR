@@ -603,12 +603,16 @@ async function execWebFetch(
 
 const ZENMUX_URL = "https://zenmux.ai/api/v1/chat/completions";
 
-async function fallbackWebSearch(
+const IS_VERCEL = process.env.VERCEL === "1";
+
+async function aiWebSearch(
   query: string,
   maxResults: number
 ): Promise<string | null> {
   const apiKey = process.env.ZENMUX_API_KEY;
   if (!apiKey) return null;
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 12000);
   try {
     const res = await fetch(ZENMUX_URL, {
       method: "POST",
@@ -630,13 +634,67 @@ async function fallbackWebSearch(
         ],
         stream: false,
       }),
-      signal: AbortSignal.timeout(15000),
+      signal: controller.signal,
     });
+    clearTimeout(t);
     if (!res.ok) return null;
     const data = await res.json();
     const text = data.choices?.[0]?.message?.content || "";
     return text.includes("NO_RESULTS") ? null : `Search results for "${query}":\n\n${text}`;
   } catch {
+    clearTimeout(t);
+    return null;
+  }
+}
+
+async function ddgWebSearch(
+  query: string,
+  maxResults: number
+): Promise<string | null> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(
+      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+      {
+        signal: controller.signal,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          Accept: "text/html",
+        },
+      }
+    );
+    clearTimeout(t);
+    const html = await res.text();
+    const results: string[] = [];
+    const linkRegex =
+      /<a[^>]+class="[^"]*result__a[^"]*"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+    const snippetRegex =
+      /<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+    const links: string[] = [];
+    const titles: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = linkRegex.exec(html)) !== null && links.length < maxResults) {
+      let href = m[1].replace(/&amp;/g, "&");
+      const rdMatch = href.match(/uddg=([^&]+)/);
+      if (rdMatch) href = decodeURIComponent(rdMatch[1]);
+      links.push(href);
+      titles.push(m[2].replace(/<[^>]+>/g, "").trim());
+    }
+    const snippets: string[] = [];
+    while ((m = snippetRegex.exec(html)) !== null && snippets.length < maxResults) {
+      snippets.push(m[1].replace(/<[^>]+>/g, "").trim());
+    }
+    for (let i = 0; i < Math.min(links.length, maxResults); i++) {
+      results.push(
+        `${i + 1}. ${titles[i] || "(no title)"}\n   URL: ${links[i]}\n   ${snippets[i] || ""}`
+      );
+    }
+    if (results.length === 0) return null;
+    return `Search results for "${query}":\n\n${results.join("\n\n")}`;
+  } catch {
+    clearTimeout(t);
     return null;
   }
 }
@@ -653,105 +711,37 @@ async function execWebSearch(
 
   const maxResults = Math.min(Math.max(Number(args.max_results) || 5, 1), 10);
 
-  try {
-    // Use DuckDuckGo's lightweight HTML search (no API key required)
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+  // On Vercel: skip DDG (often blocked), go straight to AI-based search
+  // Locally: try DDG first, fall back to AI
+  let result: string | null = null;
+  let source = "";
 
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-          "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html",
-      },
-    });
+  if (!IS_VERCEL) {
+    result = await ddgWebSearch(query, maxResults);
+    if (result) source = "DuckDuckGo";
+  }
 
-    clearTimeout(timeout);
-    const html = await res.text();
+  if (!result) {
+    result = await aiWebSearch(query, maxResults);
+    if (result) source = "AI-enhanced search";
+  }
 
-    // Parse result links from DuckDuckGo HTML
-    const results: { title: string; snippet: string; link: string }[] = [];
-    const linkRegex =
-      /<a[^>]+class="[^"]*result__a[^"]*"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
-    const snippetRegex =
-      /<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
-
-    const links: string[] = [];
-    const titles: string[] = [];
-    let m: RegExpExecArray | null;
-
-    while ((m = linkRegex.exec(html)) !== null && results.length < maxResults) {
-      let href = m[1].replace(/&amp;/g, "&");
-      // DuckDuckGo redirects through their own redirect
-      const rdMatch = href.match(/uddg=([^&]+)/);
-      if (rdMatch) href = decodeURIComponent(rdMatch[1]);
-      const title = m[2].replace(/<[^>]+>/g, "").trim();
-      links.push(href);
-      titles.push(title);
-    }
-
-    const snippets: string[] = [];
-    while ((m = snippetRegex.exec(html)) !== null && snippets.length < maxResults) {
-      snippets.push(m[1].replace(/<[^>]+>/g, "").trim());
-    }
-
-    for (let i = 0; i < Math.min(links.length, maxResults); i++) {
-      results.push({
-        title: titles[i] || "(no title)",
-        snippet: snippets[i] || "",
-        link: links[i] || "",
-      });
-    }
-
-    if (results.length === 0) {
-      // Fallback: try ZenMux-based search
-      const fallback = await fallbackWebSearch(query, maxResults);
-      if (fallback) {
-        return {
-          tool_call_id: toolCallId,
-          role: "tool",
-          name: "web_search",
-          content: fallback + "\n\n(Note: DDG returned no results; results from fallback search)",
-        };
-      }
-      return {
-        tool_call_id: toolCallId,
-        role: "tool",
-        name: "web_search",
-        content: `No search results found for "${query}".`,
-      };
-    }
-
-    const formatted = results
-      .map(
-        (r, i) =>
-          `${i + 1}. ${r.title}\n   URL: ${r.link}\n   ${r.snippet}`
-      )
-      .join("\n\n");
-
+  if (result) {
+    const note = source ? `\n\n(Source: ${source})` : "";
     return {
       tool_call_id: toolCallId,
       role: "tool",
       name: "web_search",
-      content: `Search results for "${query}":\n\n${formatted}`,
+      content: result + note,
     };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Search failed";
-    // Try fallback
-    const fallback = await fallbackWebSearch(query, maxResults);
-    if (fallback) {
-      return {
-        tool_call_id: toolCallId,
-        role: "tool",
-        name: "web_search",
-        content: fallback + `\n\n(Note: DDG search failed: ${msg}; results from fallback search)`,
-      };
-    }
-    return errorResult(toolCallId, "web_search", `Search failed: ${msg}`);
   }
+
+  return {
+    tool_call_id: toolCallId,
+    role: "tool",
+    name: "web_search",
+    content: `No search results found for "${query}".`,
+  };
 }
 
 // ── Blocked commands ───────────────────────────────────────────────────
