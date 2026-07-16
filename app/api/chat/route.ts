@@ -201,8 +201,25 @@ export async function POST(req: NextRequest) {
   const timeout = setTimeout(() => controller.abort(), 120000);
 
   try {
-    // Phase 1: Non-streaming call (may trigger tool calls)
+    // Phase 1: Auto-search when tools enabled
     let conversation = [...messagesWithSystem];
+
+    if (toolsEnabled && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1]?.content || "";
+      if (lastMsg.length > 5) {
+        const searchPromise = aiWebSearch(lastMsg, 5);
+        const timeoutPromise = new Promise<null>((r) => setTimeout(() => r(null), 8000));
+        const autoSearchResult = await Promise.race([searchPromise, timeoutPromise]);
+        if (autoSearchResult) {
+          conversation.push({
+            role: "system",
+            content:
+              "[Pre-search results for the user's query — use if relevant, otherwise ignore.]\n\n" +
+              autoSearchResult,
+          });
+        }
+      }
+    }
     let res = await callZenmux(conversation, apiKey, toolsEnabled, controller.signal);
 
     if (!res.ok) {
