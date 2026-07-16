@@ -601,6 +601,46 @@ async function execWebFetch(
   }
 }
 
+const ZENMUX_URL = "https://zenmux.ai/api/v1/chat/completions";
+
+async function fallbackWebSearch(
+  query: string,
+  maxResults: number
+): Promise<string | null> {
+  const apiKey = process.env.ZENMUX_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const res = await fetch(ZENMUX_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "stepfun/step-3.7-flash-free",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a web search tool. Given a query, return up to " +
+              maxResults +
+              " real, factual search results in this exact format:\n" +
+              "1. Title\n   URL: https://...\n   relevant snippet\n\n" +
+              "Do NOT make up results. Only return results you are confident exist. " +
+              "If you don't know any real results, return exactly: NO_RESULTS",
+          },
+          { role: "user", content: `Search the web for: ${query}` },
+        ],
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content || "";
+    return text.includes("NO_RESULTS") ? null : `Search results for "${query}":\n\n${text}`;
+  } catch {
+    return null;
+  }
+}
+
 // ── web_search ────────────────────────────────────────────────────────
 
 async function execWebSearch(
@@ -667,6 +707,16 @@ async function execWebSearch(
     }
 
     if (results.length === 0) {
+      // Fallback: try ZenMux-based search
+      const fallback = await fallbackWebSearch(query, maxResults);
+      if (fallback) {
+        return {
+          tool_call_id: toolCallId,
+          role: "tool",
+          name: "web_search",
+          content: fallback + "\n\n(Note: DDG returned no results; results from fallback search)",
+        };
+      }
       return {
         tool_call_id: toolCallId,
         role: "tool",
@@ -690,6 +740,16 @@ async function execWebSearch(
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Search failed";
+    // Try fallback
+    const fallback = await fallbackWebSearch(query, maxResults);
+    if (fallback) {
+      return {
+        tool_call_id: toolCallId,
+        role: "tool",
+        name: "web_search",
+        content: fallback + `\n\n(Note: DDG search failed: ${msg}; results from fallback search)`,
+      };
+    }
     return errorResult(toolCallId, "web_search", `Search failed: ${msg}`);
   }
 }
