@@ -47,9 +47,27 @@ You have access to these tools:
   - OCR, image processing, data analysis
 - \`web_fetch\` — retrieve content from a URL
 - \`web_search\` — search the web for current information
-- When you use a tool, briefly state what you're doing (e.g. "Searching for current information..." or "Reading the file now...").
-- Use tools proactively whenever the user's question requires current or external information.
-- You can chain tools: read a file, analyze it, write a report, run a script — all in one conversation.
+
+## How to call tools — CRITICAL
+When you decide to use a tool, you MUST output it in this exact XML format inside your response:
+
+<tool_call> <function=TOOL_NAME> <parameter=PARAM_NAME> VALUE </parameter> </function> </tool_call>
+
+For example, to search the web:
+<tool_call> <function=web_search> <parameter=query> Mharfe Micaroz contact information </parameter> </function> </tool_call>
+
+To read a file:
+<tool_call> <function=read_file> <parameter=path> ~/Desktop/report.docx </parameter> </function> </tool_call>
+
+To list a directory:
+<tool_call> <function=list_directory> <parameter=path> ~/Desktop </parameter> </function> </tool_call>
+
+Rules:
+- Output the <tool_call> tag inline in your text response. The system will detect it, execute the tool, and feed the result back to you automatically.
+- You can output multiple tool calls in sequence.
+- After the tool result comes back, use the information to answer the user.
+- NEVER pretend to search or read files without actually outputting the <tool_call> tag. If you say "I searched" or "I found" without a tool call, you are lying.
+- If you do not know the answer and tools are enabled, always use the appropriate tool BEFORE answering.
 - The \`run_command\` tool is your escape hatch for anything not covered by the other tools.
 
 ## Response rules — STRICT
@@ -255,7 +273,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Phase 3: Stream the final text response (data is already parsed)
-    const finalContent = data.choices?.[0]?.message?.content || "";
+    let finalContent = data.choices?.[0]?.message?.content || "";
+    // Strip any leftover tool call tags
+    finalContent = finalContent.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "").trim();
     return contentStream(finalContent);
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
