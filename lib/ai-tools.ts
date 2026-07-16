@@ -203,9 +203,15 @@ export const TOOL_DEFINITIONS = [
 const ZENMUX_URL = "https://zenmux.ai/api/v1/chat/completions";
 
 export async function webSearch(query: string, maxResults: number): Promise<string | null> {
-  const allParts: string[] = [];
+  // Priority 1: Tavily API (free tier, 1000 queries/month, no CC needed)
+  const tavilyKey = process.env.TAVILY_API_KEY;
+  if (tavilyKey) {
+    const tavilyResult = await searchTavily(query, maxResults, tavilyKey);
+    if (tavilyResult) return tavilyResult;
+  }
 
-  // Run reliable public APIs in parallel — no API keys needed
+  // Priority 2: Free public APIs (ORCID, Wikipedia, GitHub)
+  const allParts: string[] = [];
   await Promise.all([
     searchORCID(query, maxResults).then(r => {
       if (r) allParts.push(`--- ORCID Academic Profile ---\n${r}`);
@@ -222,8 +228,47 @@ export async function webSearch(query: string, maxResults: number): Promise<stri
     return `Search results for "${query}":\n\n${allParts.join("\n\n")}`;
   }
 
-  // Fallback: ZenMux model knowledge
+  // Priority 3: ZenMux model knowledge
   return zenmuxKnowledgeSearch(query, maxResults);
+}
+
+// ── Tavily Search API ──────────────────────────────────────────────
+
+async function searchTavily(query: string, maxResults: number, apiKey: string): Promise<string | null> {
+  try {
+    const res = await fetchWithTimeout(
+      "https://api.tavily.com/search",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          query,
+          search_depth: "basic",
+          max_results: maxResults,
+          include_answer: false,
+        }),
+      },
+      8000
+    );
+    if (!res.ok) return null;
+    const data = await res.json() as any;
+    const results = data?.results || [];
+    if (results.length === 0) return null;
+
+    const lines: string[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      lines.push(`${i + 1}. ${r.title || "Untitled"}`);
+      lines.push(`   URL: ${r.url || ""}`);
+      if (r.content) lines.push(`   ${r.content.slice(0, 300)}`);
+    }
+    return `Search results for "${query}":\n\n${lines.join("\n")}`;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchWithTimeout(url: string, opts: Record<string, any>, ms: number): Promise<Response> {
