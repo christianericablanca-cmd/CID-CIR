@@ -607,47 +607,62 @@ export async function aiWebSearch(
   query: string,
   maxResults: number
 ): Promise<string | null> {
-  // Try DDG Instant Answer API first (fast, no key needed)
-  const ddgResult = await ddgWebSearch(query, maxResults);
-  if (ddgResult) return ddgResult;
+  // Run DDG and ZenMux in parallel, each with Promise.race hard timeout
+  const results = await Promise.allSettled([
+    raceTimeout(ddgWebSearch(query, maxResults), 5000),
+    raceTimeout(zenmuxSearch(query, maxResults), 8000),
+  ]);
 
-  // Fallback: use ZenMux as a search tool (slower but works everywhere)
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value) return r.value;
+  }
+  return null;
+}
+
+async function zenmuxSearch(
+  query: string,
+  maxResults: number
+): Promise<string | null> {
   const apiKey = process.env.ZENMUX_API_KEY;
   if (!apiKey) return null;
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), 12000);
   try {
-    const res = await fetch(ZENMUX_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "stepfun/step-3.7-flash-free",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a web search tool. Given a query, return up to " +
-              maxResults +
-              " real, factual search results in this exact format:\n" +
-              "1. Title\n   URL: https://...\n   relevant snippet\n\n" +
-              "Do NOT make up results. Only return results you are confident exist. " +
-              "If you don't know any real results, return exactly: NO_RESULTS",
-          },
-          { role: "user", content: `Search the web for: ${query}` },
-        ],
-        stream: false,
+    const res = await raceTimeout(
+      fetch(ZENMUX_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "stepfun/step-3.7-flash-free",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a web search tool. Return up to " +
+                maxResults +
+                " real, factual search results in this exact format:\n" +
+                "1. Title\n   URL: https://...\n   relevant snippet\n\n" +
+                "If you don't know any real results, return exactly: NO_RESULTS",
+            },
+            { role: "user", content: `Search the web for: ${query}` },
+          ],
+          stream: false,
+        }),
       }),
-      signal: controller.signal,
-    });
-    clearTimeout(t);
+      8000
+    ) as Response;
     if (!res.ok) return null;
     const data = await res.json();
     const text = data.choices?.[0]?.message?.content || "";
     return text.includes("NO_RESULTS") ? null : `Search results for "${query}":\n\n${text}`;
   } catch {
-    clearTimeout(t);
     return null;
   }
+}
+
+function raceTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("race timeout")), ms)),
+  ]);
 }
 
 async function ddgWebSearch(
