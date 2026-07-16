@@ -48,27 +48,25 @@ You have access to these tools:
 - \`web_fetch\` — retrieve content from a URL
 - \`web_search\` — search the web for current information
 
-## How to call tools — CRITICAL
-When you decide to use a tool, you MUST output it in this exact XML format inside your response:
+## TOOL CALLING — YOU MUST USE THIS
+When you need to use a tool, output EXACTLY one of these formats in your response. The system WILL detect it, run the tool, and give you the result.
 
+**Format A (XML):**
 <tool_call> <function=TOOL_NAME> <parameter=PARAM_NAME> VALUE </parameter> </function> </tool_call>
 
-For example, to search the web:
+Example:
 <tool_call> <function=web_search> <parameter=query> Mharfe Micaroz contact information </parameter> </function> </tool_call>
 
-To read a file:
-<tool_call> <function=read_file> <parameter=path> ~/Desktop/report.docx </parameter> </function> </tool_call>
+**Format B (JSON):**
+TOOL_CALL: name {"param": "value"}
 
-To list a directory:
-<tool_call> <function=list_directory> <parameter=path> ~/Desktop </parameter> </function> </tool_call>
+Example:
+TOOL_CALL: web_search {"query": "Mharfe Micaroz"}
 
-Rules:
-- Output the <tool_call> tag inline in your text response. The system will detect it, execute the tool, and feed the result back to you automatically.
-- You can output multiple tool calls in sequence.
-- After the tool result comes back, use the information to answer the user.
-- NEVER pretend to search or read files without actually outputting the <tool_call> tag. If you say "I searched" or "I found" without a tool call, you are lying.
-- If you do not know the answer and tools are enabled, always use the appropriate tool BEFORE answering.
-- The \`run_command\` tool is your escape hatch for anything not covered by the other tools.
+**CRITICAL RULES:**
+- If the user asks for current info, SEARCH FIRST using a tool call. Do NOT answer without a tool call.
+- If you say "I searched" without outputting a tool call, you are lying. The system will catch you.
+- After the tool result returns, use it to formulate your answer.
 
 ## Response rules — STRICT
 1. **Only state what you know to be true.** Never speculate, assume, or fabricate. Never use hedging phrases like "it may be", "it could be", "it might be", "I believe", "I think", "it is possible that", "it is likely that", "unverified", "allegedly", "purportedly", "reportedly", "supposedly", or any similar hedging language.
@@ -112,24 +110,34 @@ async function callZenmux(
 }
 
 function parseTextToolCalls(content: string): ParsedToolCall[] {
-  const toolCallRegex = /<tool_call>[\s\S]*?<\/tool_call>/gi;
-  const functionRegex = /<function=(\w+)>([\s\S]*?)<\/function>/i;
-  const paramRegex = /<parameter=(\w+)>([\s\S]*?)<\/parameter>/gi;
   const calls: ParsedToolCall[] = [];
+
+  // Format 1: <tool_call> <function=NAME> <parameter=KEY> VALUE </parameter> </function> </tool_call>
+  const toolCallRegex = /<tool_call>[\s\S]*?<\/tool_call>/gi;
   let match: RegExpExecArray | null;
   while ((match = toolCallRegex.exec(content)) !== null) {
     const block = match[0];
-    const funcMatch = functionRegex.exec(block);
+    const funcMatch = /<function=(\w+)>([\s\S]*?)<\/function>/i.exec(block);
     if (!funcMatch) continue;
     const name = funcMatch[1];
     const args: Record<string, string> = {};
-    let paramMatch: RegExpExecArray | null;
-    const paramRe = new RegExp(paramRegex.source, "gi");
-    while ((paramMatch = paramRe.exec(block)) !== null) {
-      args[paramMatch[1].trim()] = paramMatch[2].trim();
+    const paramRe = /<parameter=(\w+)>([\s\S]*?)<\/parameter>/gi;
+    let pm: RegExpExecArray | null;
+    while ((pm = paramRe.exec(block)) !== null) {
+      args[pm[1].trim()] = pm[2].trim();
     }
     calls.push({ name, args });
   }
+
+  // Format 2: TOOL_CALL: name {"key": "value"}  (case-insensitive)
+  const jsonRegex = /tool_call:\s*(\w+)\s*(\{[\s\S]*?\})/gi;
+  while ((match = jsonRegex.exec(content)) !== null) {
+    try {
+      const args = JSON.parse(match[2]);
+      calls.push({ name: match[1], args });
+    } catch { /* skip malformed JSON */ }
+  }
+
   return calls;
 }
 
