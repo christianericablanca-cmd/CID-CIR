@@ -49,14 +49,29 @@ You have access to these tools:
 - \`web_search\` — search the web
 
 ## AUTO-SEARCH RESULTS
-The system has ALREADY searched public databases (ORCID, Wikipedia, GitHub) before you respond. Look for a system message labeled "[Auto-search results]" above. Read those results carefully — they contain real, verified data from public APIs.
+The system has ALREADY performed a live web search via the Tavily search API. Look for a system message labeled "[Auto-search results]" above. Those results contain real, verified URLs and data from across the web (LinkedIn, Facebook, news, academic databases, etc.).
 
-If auto-search results are present, use them to answer the user. Do NOT call \`web_search\` again unless you need more specific detail.
+## CRITICAL — You MUST present search results with full URLs
+When you have auto-search results, your response MUST:
+1. List EVERY search result as a bullet point with its full clickable URL
+2. Format: \`- **Site name** — [clickable URL](https://...)\`
+3. After the URL list, provide your analysis/summary
+4. NEVER replace a URL with a vague description like "Facebook post" without the link
+5. NEVER invent sources. Only use what's in the search results.
 
-If auto-search results are NOT present (e.g., the search did not complete), you may call \`web_search\` yourself using the format below.
+Example format:
+\`\`\`
+## Raw Search Results
+- **LinkedIn** — https://ph.linkedin.com/in/...
+- **Facebook** — https://facebook.com/...
+- **Google Scholar** — https://scholar.google.com/...
 
-## TOOL CALLING FORMAT — CRITICAL
-To call a tool, output EXACTLY this XML format — nothing else for that turn:
+## Analysis
+[your summary here]
+\`\`\`
+
+## TOOL CALLING FORMAT
+To call a tool, output EXACTLY this XML format:
 
 <tool_call>
 <function=web_search>
@@ -66,7 +81,7 @@ To call a tool, output EXACTLY this XML format — nothing else for that turn:
 </tool_call>
 
 Available tools:
-- \`web_search(query, max_results)\` — search the web (ORCID, Wikipedia, GitHub)
+- \`web_search(query, max_results)\` — search the web
 - \`web_fetch(url, format)\` — fetch a URL's content
 - \`read_file(path)\` — read files
 - \`list_directory(path, max_depth)\` — list directory
@@ -76,11 +91,11 @@ Available tools:
 - \`run_command(command, workdir, timeout)\` — run shell commands
 
 ## SEARCH RULES — STRICT
-1. When auto-search results are provided, read them and answer immediately. Do NOT call tools again unless you need more detail.
+1. When auto-search results are provided, read them and answer immediately.
 2. NEVER invent, speculate, or fabricate information. Only state what is in the search results.
 3. NEVER describe what search methods you WOULD use. Just present the results.
-4. NEVER say "I searched the web" — the search was done by the system. Just present the results.
-5. Format answers cleanly with markdown and cite sources (URLs) when possible.
+4. NEVER say "I searched the web" — the search was done by the system.
+5. Always include full clickable URLs for every source.
 
 Current date: ${new Date().toISOString().split("T")[0]}`;
 
@@ -186,7 +201,7 @@ export async function POST(req: NextRequest) {
           if (searchResult) {
             conversation.push({
               role: "system",
-              content: "[Auto-search results — read these carefully and use them to answer the user. They are from live public databases (ORCID, Wikipedia, GitHub).]\n\n" + searchResult,
+              content: "[Auto-search results — these are live web search results from Tavily. Each entry includes a URL. You MUST present every result with its full clickable URL in your response.]\n\n" + searchResult,
             });
           }
         } catch {
