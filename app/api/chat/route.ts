@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TOOL_DEFINITIONS, executeToolCall, webSearch } from "@/lib/ai-tools";
+import { TOOL_DEFINITIONS, executeToolCall } from "@/lib/ai-tools";
 
 export const maxDuration = 60;
 
@@ -48,19 +48,34 @@ You have access to these tools:
 - \`web_fetch\` — fetch a URL's content
 - \`web_search\` — search the web
 
-## SEARCH BEHAVIOR — CRITICAL
-When you need current information (OSINT, people lookup, news, etc.):
-1. The system has ALREADY performed an automatic web search before you respond. Search results are injected into this conversation as a system message labeled "[Auto-search results]".
-2. Read those results carefully. Use them to answer the user.
-3. If you need additional/different information, output a \`web_search\` tool call to search again.
-4. NEVER say "I searched the web" or "I conducted searches" — the search was done by the system, not by you. Just use the results provided.
+## TOOL CALLING FORMAT — CRITICAL
+You can call tools to get real-time information. To call a tool, output EXACTLY this XML format — nothing else for that turn:
 
-## Response rules — STRICT
-1. Only state what you know to be true. Never speculate, assume, or fabricate. Never use hedging phrases.
-2. If you do not know the answer and no search results are available, say exactly: "I don't have information about that in my training data or search results."
-3. If you are unsure about a detail, do not guess. State only what is verifiable.
-4. Cite sources when using search results (the URL or source name).
-5. Format answers cleanly with markdown.
+<tool_call>
+<function=web_search>
+<parameter=query>your search query</parameter>
+<parameter=max_results>5</parameter>
+</function>
+</tool_call>
+
+Available tools and their parameters:
+- \`web_search(query, max_results)\` — search the web for current information. Use this when the user asks about a person, organization, event, or anything that may be outside your training data.
+- \`web_fetch(url, format)\` — fetch the content of a specific URL.
+- \`read_file(path)\` — read a file from the local filesystem.
+- \`list_directory(path, max_depth)\` — list files in a directory.
+- \`write_file(path, content)\` — write a file.
+- \`delete_file(path)\` — delete a file.
+- \`copy_file(source, destination)\` — copy files or directories.
+- \`run_command(command, workdir, timeout)\` — execute a shell command.
+
+## SEARCH RULES — STRICT
+1. When the user asks you to find information about a person (OSINT, people lookup, background check), you MUST start by calling \`web_search\` before you respond. Do NOT try to answer from memory.
+2. After calling \`web_search\`, the search results will be shown to you. Read them carefully and use them to answer the user.
+3. If you need more details, call \`web_search\` again with a refined query, or call \`web_fetch\` to read a specific URL.
+4. NEVER invent, speculate, or fabricate information. Only state what is in the search results.
+5. NEVER describe what search methods you WOULD use. Just DO the search by outputting a tool call.
+6. NEVER say "I searched the web" — the search is done by the tool, not by you. Just present the results.
+7. Format answers cleanly with markdown and cite sources (URLs) when possible.
 
 Current date: ${new Date().toISOString().split("T")[0]}`;
 
@@ -153,35 +168,6 @@ export async function POST(req: NextRequest) {
 
   try {
     let conversation = [...messagesWithSystem];
-
-    // Auto-search with Brave Search API (works on Vercel)
-    if (toolsEnabled && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1]?.content || "";
-      if (lastMsg.length > 5) {
-        try {
-          const searchResult = await Promise.race([
-            webSearch(lastMsg, 5),
-            new Promise<string | null>((r) => setTimeout(() => r(null), 8000)),
-          ]) as string | null;
-          if (searchResult) {
-            conversation.push({
-              role: "system",
-              content: "[Auto-search results — read these carefully and use them to answer the user. They are from a live web search.]\n\n" + searchResult,
-            });
-          } else {
-            conversation.push({
-              role: "system",
-              content: "[Auto-search: The web search did not return any results for the user's query. Answer based on your training data if possible, or state that you don't know.]",
-            });
-          }
-        } catch {
-          conversation.push({
-            role: "system",
-            content: "[Auto-search: The web search attempt failed. Answer based on your training data if possible.]",
-          });
-        }
-      }
-    }
 
     let res = await callZenmux(conversation, apiKey, toolsEnabled, controller.signal);
 
