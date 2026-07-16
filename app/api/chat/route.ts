@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { TOOL_DEFINITIONS, executeToolCall, aiWebSearch } from "@/lib/ai-tools";
+import { TOOL_DEFINITIONS, executeToolCall, webSearch } from "@/lib/ai-tools";
+
+export const maxDuration = 60;
 
 interface ParsedToolCall {
   name: string;
@@ -34,51 +36,31 @@ const SYSTEM_PROMPT = `You are CID's AI assistant, an expert OSINT and cybersecu
 
 ## File analysis
 - You can analyze text-based files uploaded by the user (logs, code, configs, CSVs, JSON, .docx, .pdf, and more).
-- When a file is provided, its content is included in the user's message.
 
 ## Tool access (when user enables)
 You have access to these tools:
-- \`read_file\` — read text files AND .docx files (text extracted). Cannot read PDF directly.
-- \`list_directory\` — explore directory structure (up to 3 levels deep)
-- \`write_file\` — create or overwrite files (scripts, reports, configs)
-- \`delete_file\` — permanently delete a file (not directories)
-- \`copy_file\` — copy files or directories from one location to another
-- \`run_command\` — execute any shell command or Python script. Use this for:
-  - Running Python scripts (e.g., \`python script.py\`)
-  - Processing PDFs with Python (e.g., \`python -c "import PyPDF2; ..."\`)
-  - Running git, npm, pip, or any CLI tool
-  - Creating directories (\`mkdir\`), moving/renaming files (\`mv\`, \`rename\`)
-  - OCR, image processing, data analysis
-- \`web_fetch\` — retrieve content from a URL
-- \`web_search\` — search the web for current information
+- \`read_file\` — read text files AND .docx files (text extracted)
+- \`list_directory\` — explore directory structure
+- \`write_file\` — create or overwrite files
+- \`delete_file\` — delete a file
+- \`copy_file\` — copy files or directories
+- \`run_command\` — execute shell commands or Python scripts
+- \`web_fetch\` — fetch a URL's content
+- \`web_search\` — search the web
 
-## TOOL CALLING — YOU MUST USE THIS
-When you need to use a tool, output EXACTLY one of these formats in your response. The system WILL detect it, run the tool, and give you the result.
-
-**Format A (XML):**
-<tool_call> <function=TOOL_NAME> <parameter=PARAM_NAME> VALUE </parameter> </function> </tool_call>
-
-Example:
-<tool_call> <function=web_search> <parameter=query> latest data breach news Philippines </parameter> </function> </tool_call>
-
-**Format B (JSON):**
-TOOL_CALL: name {"param": "value"}
-
-Example:
-TOOL_CALL: web_search {"query": "data breach notification NPC Philippines"}
-
-**CRITICAL RULES:**
-- If the user asks for current info or OSINT, output a tool call. After the result comes back, formulate your answer.
-- If you say "I searched" without outputting a tool call, you are lying. Always output the tool call.
-- If a search returns no results, state that honestly. Do not refuse or lecture the user.
+## SEARCH BEHAVIOR — CRITICAL
+When you need current information (OSINT, people lookup, news, etc.):
+1. The system has ALREADY performed an automatic web search before you respond. Search results are injected into this conversation as a system message labeled "[Auto-search results]".
+2. Read those results carefully. Use them to answer the user.
+3. If you need additional/different information, output a \`web_search\` tool call to search again.
+4. NEVER say "I searched the web" or "I conducted searches" — the search was done by the system, not by you. Just use the results provided.
 
 ## Response rules — STRICT
-1. **Only state what you know to be true.** Never speculate, assume, or fabricate. Never use hedging phrases like "it may be", "it could be", "it might be", "I believe", "I think", "it is possible that", "it is likely that", "unverified", "allegedly", "purportedly", "reportedly", "supposedly", or any similar hedging language.
-2. **If you do not know the answer**, say exactly: "I don't have information about that in my training data." If tools are enabled, use \`web_search\` or \`web_fetch\` to try to find the answer first. Only say you don't know after attempting to search.
-3. **If you are unsure about a detail**, do not guess. State only what is verifiable.
-4. **Distinguish clearly** between what is in your training data and what you retrieved from tools. When using tools, cite the source (URL or filename).
-5. **For specific claims about people, organizations, or events**, use \`web_search\` to verify before answering if the information might be time-sensitive or outside your training data cutoff.
-6. **Format answers cleanly** with markdown (headings, lists, code blocks, tables) where appropriate. For code, always specify the language for syntax highlighting.
+1. Only state what you know to be true. Never speculate, assume, or fabricate. Never use hedging phrases.
+2. If you do not know the answer and no search results are available, say exactly: "I don't have information about that in my training data or search results."
+3. If you are unsure about a detail, do not guess. State only what is verifiable.
+4. Cite sources when using search results (the URL or source name).
+5. Format answers cleanly with markdown.
 
 Current date: ${new Date().toISOString().split("T")[0]}`;
 
@@ -106,42 +88,11 @@ async function callZenmux(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
+      Connection: "close",
     },
     body: JSON.stringify(body),
     signal,
   });
-}
-
-function parseTextToolCalls(content: string): ParsedToolCall[] {
-  const calls: ParsedToolCall[] = [];
-
-  // Format 1: <tool_call> <function=NAME> <parameter=KEY> VALUE </parameter> </function> </tool_call>
-  const toolCallRegex = /<tool_call>[\s\S]*?<\/tool_call>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = toolCallRegex.exec(content)) !== null) {
-    const block = match[0];
-    const funcMatch = /<function=(\w+)>([\s\S]*?)<\/function>/i.exec(block);
-    if (!funcMatch) continue;
-    const name = funcMatch[1];
-    const args: Record<string, string> = {};
-    const paramRe = /<parameter=(\w+)>([\s\S]*?)<\/parameter>/gi;
-    let pm: RegExpExecArray | null;
-    while ((pm = paramRe.exec(block)) !== null) {
-      args[pm[1].trim()] = pm[2].trim();
-    }
-    calls.push({ name, args });
-  }
-
-  // Format 2: TOOL_CALL: name {"key": "value"}  (case-insensitive)
-  const jsonRegex = /tool_call:\s*(\w+)\s*(\{[\s\S]*?\})/gi;
-  while ((match = jsonRegex.exec(content)) !== null) {
-    try {
-      const args = JSON.parse(match[2]);
-      calls.push({ name: match[1], args });
-    } catch { /* skip malformed JSON */ }
-  }
-
-  return calls;
 }
 
 function contentStream(content: string): Response {
@@ -198,26 +149,40 @@ export async function POST(req: NextRequest) {
   ];
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000);
+  const timeout = setTimeout(() => controller.abort(), 55000);
 
   try {
-    // Phase 1: Auto-search when tools enabled
     let conversation = [...messagesWithSystem];
 
+    // Auto-search with Brave Search API (works on Vercel)
     if (toolsEnabled && messages.length > 0) {
       const lastMsg = messages[messages.length - 1]?.content || "";
       if (lastMsg.length > 5) {
-        const searchPromise = aiWebSearch(lastMsg, 5);
-        const timeoutPromise = new Promise<string>((r) => setTimeout(() => r("TIMEOUT"), 10000));
-        const autoSearchResult = await Promise.race([searchPromise, timeoutPromise]);
-        const searchContext = autoSearchResult === "TIMEOUT"
-          ? "[System note: Web search timed out after 10 seconds. Answer based on your training data.]"
-          : autoSearchResult
-            ? "[Pre-search results for the user's query — use if relevant, otherwise ignore.]\n\n" + autoSearchResult
-            : "[System note: Web search completed but found no results for this query. Answer based on your training data.]";
-        conversation.push({ role: "system", content: searchContext });
+        try {
+          const searchResult = await Promise.race([
+            webSearch(lastMsg, 5),
+            new Promise<string | null>((r) => setTimeout(() => r(null), 8000)),
+          ]) as string | null;
+          if (searchResult) {
+            conversation.push({
+              role: "system",
+              content: "[Auto-search results — read these carefully and use them to answer the user. They are from a live web search.]\n\n" + searchResult,
+            });
+          } else {
+            conversation.push({
+              role: "system",
+              content: "[Auto-search: The web search did not return any results for the user's query. Answer based on your training data if possible, or state that you don't know.]",
+            });
+          }
+        } catch {
+          conversation.push({
+            role: "system",
+            content: "[Auto-search: The web search attempt failed. Answer based on your training data if possible.]",
+          });
+        }
       }
     }
+
     let res = await callZenmux(conversation, apiKey, toolsEnabled, controller.signal);
 
     if (!res.ok) {
@@ -232,28 +197,20 @@ export async function POST(req: NextRequest) {
     let choice = data.choices?.[0];
     let msg = choice?.message;
 
-    // Phase 2: Handle tool calls in a loop
+    // Phase 2: Handle tool calls loop
     let loopCount = 0;
     const MAX_TOOL_LOOPS = 10;
 
     while (loopCount < MAX_TOOL_LOOPS) {
-      // Check structured tool calls or text-based fallback
       const textCalls = msg?.content ? parseTextToolCalls(msg.content) : [];
       const hasStructuredCalls = msg?.tool_calls && msg.tool_calls.length > 0;
       const hasTextCalls = textCalls.length > 0;
 
-      if (!hasStructuredCalls && !hasTextCalls) {
-        // Debug: first iteration with tools enabled but no tool call detected
-        if (loopCount === 0 && toolsEnabled) {
-          console.log("[CID AI] No tool call detected in model response. Content preview:", msg?.content?.slice(0, 200));
-        }
-        break;
-      }
+      if (!hasStructuredCalls && !hasTextCalls) break;
 
       loopCount++;
 
       if (hasStructuredCalls) {
-        // Native tool_calls format
         conversation.push({
           role: "assistant",
           content: msg.content || "",
@@ -267,7 +224,6 @@ export async function POST(req: NextRequest) {
         );
         conversation.push(...toolResults);
       } else {
-        // Text-based fallback: parse <tool_call> tags
         conversation.push({
           role: "assistant",
           content: msg.content || "",
@@ -281,7 +237,6 @@ export async function POST(req: NextRequest) {
         conversation.push(...toolResults);
       }
 
-      // Call again with tool results included
       res = await callZenmux(conversation, apiKey, toolsEnabled, controller.signal);
 
       if (!res.ok) {
@@ -304,9 +259,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Phase 3: Stream the final text response (data is already parsed)
     let finalContent = data.choices?.[0]?.message?.content || "";
-    // Strip any leftover tool call tags
     finalContent = finalContent.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, "").trim();
     return contentStream(finalContent);
   } catch (err) {
@@ -319,4 +272,31 @@ export async function POST(req: NextRequest) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function parseTextToolCalls(content: string): ParsedToolCall[] {
+  const calls: ParsedToolCall[] = [];
+  const toolCallRegex = /<tool_call>[\s\S]*?<\/tool_call>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = toolCallRegex.exec(content)) !== null) {
+    const block = match[0];
+    const funcMatch = /<function=(\w+)>([\s\S]*?)<\/function>/i.exec(block);
+    if (!funcMatch) continue;
+    const name = funcMatch[1];
+    const args: Record<string, string> = {};
+    const paramRe = /<parameter=(\w+)>([\s\S]*?)<\/parameter>/gi;
+    let pm: RegExpExecArray | null;
+    while ((pm = paramRe.exec(block)) !== null) {
+      args[pm[1].trim()] = pm[2].trim();
+    }
+    calls.push({ name, args });
+  }
+  const jsonRegex = /tool_call:\s*(\w+)\s*(\{[\s\S]*?\})/gi;
+  while ((match = jsonRegex.exec(content)) !== null) {
+    try {
+      const args = JSON.parse(match[2]);
+      calls.push({ name: match[1], args });
+    } catch { /* skip */ }
+  }
+  return calls;
 }
