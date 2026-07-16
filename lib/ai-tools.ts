@@ -221,12 +221,12 @@ async function bingSearch(query: string, maxResults: number): Promise<string | n
           Connection: "close",
         },
       }),
-      new Promise<Response>((_, reject) => setTimeout(() => reject(new Error("timeout")), 6000)),
+      new Promise<Response>((_, reject) => setTimeout(() => reject(new Error("timeout")), 4000)),
     ]) as Response;
     if (!res.ok) return null;
     const html = await Promise.race([
       res.text(),
-      new Promise<string>((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
+      new Promise<string>((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
     ]) as string;
     const results: string[] = [];
     const linkRegex = /<a[^>]+href="(https?:\/\/(?!.*bing.com)[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
@@ -274,7 +274,7 @@ async function zenmuxKnowledgeSearch(query: string, maxResults: number): Promise
           stream: false,
         }),
       }),
-      new Promise<Response>((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
+      new Promise<Response>((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
     ]) as Response;
     if (!res.ok) return null;
     const data = await res.json();
