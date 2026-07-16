@@ -607,16 +607,49 @@ export async function aiWebSearch(
   query: string,
   maxResults: number
 ): Promise<string | null> {
-  // Run DDG and ZenMux in parallel, each with Promise.race hard timeout
-  const results = await Promise.allSettled([
-    raceTimeout(ddgWebSearch(query, maxResults), 5000),
+  // Try multiple search engines in parallel
+  const searches = [
+    raceTimeout(bingWebSearch(query, maxResults), 5000),
+    raceTimeout(ddgWebSearch(query, maxResults), 6000),
     raceTimeout(zenmuxSearch(query, maxResults), 8000),
-  ]);
+  ];
+  const results = await Promise.allSettled(searches);
 
   for (const r of results) {
     if (r.status === "fulfilled" && r.value) return r.value;
   }
   return null;
+}
+
+async function bingWebSearch(
+  query: string,
+  _maxResults: number
+): Promise<string | null> {
+  try {
+    const res = (await raceTimeout(
+      fetch(`https://www.bing.com/search?q=${encodeURIComponent(query)}`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          Accept: "text/html",
+        },
+      }),
+      5000
+    )) as Response;
+    if (!res.ok) return null;
+    const html = (await raceTimeout(res.text(), 5000)) as string;
+    const results: string[] = [];
+    const linkRegex = /<a[^>]+href="(https?:\/\/(?!.*bing.com)[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = linkRegex.exec(html)) !== null && results.length < _maxResults) {
+      const title = m[2].replace(/<[^>]+>/g, "").trim();
+      if (title.length > 3) {
+        results.push(`${results.length + 1}. ${title}\n   URL: ${m[1]}`);
+      }
+    }
+    return results.length > 0 ? `Web search results for "${query}":\n\n${results.join("\n\n")}` : null;
+  } catch {
+    return null;
+  }
 }
 
 async function zenmuxSearch(

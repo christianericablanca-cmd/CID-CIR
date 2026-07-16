@@ -208,16 +208,14 @@ export async function POST(req: NextRequest) {
       const lastMsg = messages[messages.length - 1]?.content || "";
       if (lastMsg.length > 5) {
         const searchPromise = aiWebSearch(lastMsg, 5);
-        const timeoutPromise = new Promise<null>((r) => setTimeout(() => r(null), 8000));
+        const timeoutPromise = new Promise<string>((r) => setTimeout(() => r("TIMEOUT"), 10000));
         const autoSearchResult = await Promise.race([searchPromise, timeoutPromise]);
-        if (autoSearchResult) {
-          conversation.push({
-            role: "system",
-            content:
-              "[Pre-search results for the user's query — use if relevant, otherwise ignore.]\n\n" +
-              autoSearchResult,
-          });
-        }
+        const searchContext = autoSearchResult === "TIMEOUT"
+          ? "[System note: Web search timed out after 10 seconds. Answer based on your training data.]"
+          : autoSearchResult
+            ? "[Pre-search results for the user's query — use if relevant, otherwise ignore.]\n\n" + autoSearchResult
+            : "[System note: Web search completed but found no results for this query. Answer based on your training data.]";
+        conversation.push({ role: "system", content: searchContext });
       }
     }
     let res = await callZenmux(conversation, apiKey, toolsEnabled, controller.signal);
