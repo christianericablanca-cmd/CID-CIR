@@ -205,13 +205,15 @@ export async function POST(req: NextRequest) {
 
     if (toolsEnabled && messages.length > 0) {
       const lastMsg = messages[messages.length - 1]?.content || "";
-      if (lastMsg.length > 3) {
-        const autoSearchResult = await aiWebSearch(lastMsg, 5);
+      if (lastMsg.length > 5) {
+        const searchPromise = aiWebSearch(lastMsg, 5);
+        const timeoutPromise = new Promise<null>((r) => setTimeout(() => r(null), 10000));
+        const autoSearchResult = await Promise.race([searchPromise, timeoutPromise]);
         if (autoSearchResult) {
           conversation.push({
             role: "system",
             content:
-              "[The system automatically searched the web for the user's query. Here are the results — use them if relevant to your answer, otherwise ignore them.]\n\n" +
+              "[Pre-search results for the user's query — use if relevant, otherwise ignore.]\n\n" +
               autoSearchResult,
           });
         }
